@@ -21,9 +21,10 @@ ENV/
 Thumbs.db
 
 # Data and training artifacts
+
 #data/raw/*.jsonl
-data/processed/*.jsonl
-data/splits/*.jsonl
+#data/processed/*.jsonl
+#data/splits/*.jsonl
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/splits/.gitkeep
@@ -35,7 +36,6 @@ runs/
 *.safetensors
 
 # Evaluation & logs
-eval/results.json
 *.log
 
 
