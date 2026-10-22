@@ -1,0 +1,18 @@
+{
+  "model": "xlm-roberta-base",
+  "input": "text_full",
+  "same_20_calls_as_baseline": {
+    "calls": 20,
+    "MAE_points": 14.1,
+    "scam_recall": 0.9,
+    "false_alarm_rate": 0.3,
+    "avg_call_fraction_at_first_alert": 0.39
+  },
+  "all_test_calls": {
+    "calls": 92,
+    "MAE_points": 12.4,
+    "scam_recall": 0.864,
+    "false_alarm_rate": 0.125,
+    "avg_call_fraction_at_first_alert": 0.49
+  }
+}
