@@ -1,0 +1,10 @@
+{
+  "input": "full",
+  "threshold": 50,
+  "calls": 20,
+  "rows": 211,
+  "MAE_points": 8.4,
+  "scam_recall": 1.0,
+  "false_alarm_rate": 0.0,
+  "avg_call_fraction_at_first_alert": 0.16
+}
