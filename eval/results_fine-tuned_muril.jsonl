@@ -1,0 +1,21 @@
+{
+  "model": "google/muril-base-cased",
+  "input": "text_full",
+  "threshold_chosen_on_val": 40,
+  "val": {
+    "calls": 43,
+    "threshold": 40,
+    "MAE_points": 7.4,
+    "scam_recall": 0.966,
+    "false_alarm_rate": 0.0,
+    "avg_call_fraction_at_first_alert": 0.32
+  },
+  "test": {
+    "calls": 92,
+    "threshold": 40,
+    "MAE_points": 10.2,
+    "scam_recall": 0.955,
+    "false_alarm_rate": 0.146,
+    "avg_call_fraction_at_first_alert": 0.46
+  }
+}
