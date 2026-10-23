@@ -1,3 +1,15 @@
+---
+title: Sachet — Real-Time Scam Call Detector
+emoji: 🛡️
+colorFrom: red
+colorTo: orange
+sdk: gradio
+app_file: app.py
+pinned: false
+license: mit
+short_description: Hindi/Hinglish real-time scam call risk detector (MuRIL + heuristics)
+---
+
 # Sachet (सचेत) 🛡️
 
 **Real-Time Scam-Call Risk Detector for Hindi & Hinglish Phone Calls**  

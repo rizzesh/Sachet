@@ -1,7 +1,10 @@
 import os, re, time, zlib, torch
 import io
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Header, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -9,17 +12,49 @@ from faster_whisper import WhisperModel
 
 load_dotenv()
 MODEL_PATH = os.getenv("MODEL_PATH", "models/sachet_muril_v2")
+HF_MODEL_REPO = os.getenv("HF_MODEL_REPO", "")   # e.g. "your-hf-username/sachet-muril-v2"
+HF_TOKEN      = os.getenv("HF_TOKEN", "")          # fine-grained token from https://huggingface.co/settings/tokens
+USE_HF_INFERENCE = os.getenv("USE_HF_INFERENCE", "false").lower() in ("true", "1", "yes")
+
 API_KEY = os.getenv("SACHET_API_KEY", "")
 LO, HI, MAXLEN = 8, 94, 512
 MEDIUM, HIGH = 38, 62
 EXPIRY = 30 * 60
 
-stt = WhisperModel(os.getenv("STT_MODEL", "small"), device="cpu", compute_type="int8")
+# ── Dual-Mode Inference Engine (Local PyTorch vs Free HF Serverless API) ──────
+tok = None
+model = None
+hf_client = None
+stt = None
 
-tok = AutoTokenizer.from_pretrained(MODEL_PATH)
-tok.truncation_side = "left"
-model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
-model.eval()
+# If running in cloud / Render Free Tier or local model not present: use Serverless API (Zero RAM)
+if HF_MODEL_REPO and (USE_HF_INFERENCE or not Path(MODEL_PATH).exists()):
+    print(f"[Sachet] Free Serverless Inference Mode enabled for '{HF_MODEL_REPO}' (~45MB RAM)")
+    try:
+        from huggingface_hub import InferenceClient
+        hf_client = InferenceClient(token=HF_TOKEN or None)
+    except Exception as e:
+        print(f"[Sachet] Warning initializing HF InferenceClient: {e}")
+elif Path(MODEL_PATH).exists():
+    # Local PyTorch mode (offline development on PC)
+    print(f"[Sachet] Loading local PyTorch model from '{MODEL_PATH}'…")
+    try:
+        tok = AutoTokenizer.from_pretrained(MODEL_PATH)
+        tok.truncation_side = "left"
+        model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
+        model.eval()
+    except Exception as e:
+        print(f"[Sachet] Error loading local model: {e}")
+
+def get_stt():
+    """Lazy-load Whisper model only if audio endpoint is hit to conserve RAM on free tier."""
+    global stt
+    if stt is None:
+        try:
+            stt = WhisperModel(os.getenv("STT_MODEL", "tiny"), device="cpu", compute_type="int8")
+        except Exception as e:
+            print(f"[Sachet] Whisper init warning: {e}")
+    return stt
 
 NEG = re.compile(r"\b(mat|nahi|nahin|kabhi nahi|never|not|don'?t|na dein|nahi maangte|nahi maangta)\b|मत|नहीं|कभी नहीं", re.I)
 
@@ -362,6 +397,27 @@ app = FastAPI(title="Sachet API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 sessions = {}
 
+# ── Serve the static frontend when deployed (client/ directory next to api/) ──
+# NOTE: This block is intentionally placed BEFORE the @app routes so that
+# the wildcard StaticFiles mount is registered LAST (after all /v1/* routes).
+_CLIENT_DIR = Path(__file__).parent.parent / "client"
+_SERVE_STATIC = _CLIENT_DIR.exists()
+
+def _register_static_routes():
+    if not _SERVE_STATIC:
+        return
+
+    @app.get("/", include_in_schema=False)
+    def serve_index():
+        return FileResponse(str(_CLIENT_DIR / "index.html"))
+
+    @app.get("/{page}.html", include_in_schema=False)
+    def serve_page(page: str):
+        p = _CLIENT_DIR / f"{page}.html"
+        if p.exists():
+            return FileResponse(str(p))
+        return FileResponse(str(_CLIENT_DIR / "index.html"))
+
 class Chunk(BaseModel):
   session_id: str
   text: str
@@ -462,10 +518,33 @@ def calculate_heuristic_escalation(found, n_turns):
   return float(raw)
 
 def muril_inference(text):
-  enc = tok(text, truncation=True, max_length=256, return_tensors="pt")
-  with torch.inference_mode():
-    p = model(**enc).logits.squeeze().clamp(0, 1).item()
-  return p
+    # 1. Local PyTorch model (if loaded on PC)
+    if model is not None and tok is not None:
+        try:
+            enc = tok(text, truncation=True, max_length=256, return_tensors="pt")
+            with torch.inference_mode():
+                p = model(**enc).logits.squeeze().clamp(0, 1).item()
+            return p
+        except Exception as e:
+            print(f"[Sachet] Local inference error: {e}")
+
+    # 2. Serverless Hugging Face Inference API (Free tier cloud - ~0 MB RAM)
+    if hf_client is not None and HF_MODEL_REPO:
+        try:
+            res = hf_client.text_classification(text=text[:512], model=HF_MODEL_REPO)
+            for item in res:
+                lbl = getattr(item, "label", "") or (item.get("label", "") if isinstance(item, dict) else "")
+                sc = getattr(item, "score", 0.0) or (item.get("score", 0.0) if isinstance(item, dict) else 0.0)
+                if lbl.upper() in ("LABEL_1", "SCAM", "POSITIVE", "1"):
+                    return float(sc)
+            if res:
+                first_score = getattr(res[0], "score", 0.5) if hasattr(res[0], "score") else res[0].get("score", 0.5)
+                return float(first_score)
+        except Exception as e:
+            print(f"[Sachet] HF Serverless Inference warning: {e}")
+
+    # 3. Graceful fallback
+    return 0.5
 
 def evaluate_risk(lines, sid):
   found, safe, n_turns = detect(lines)
@@ -580,6 +659,16 @@ def health():
 @app.post("/v1/transcribe")
 async def transcribe(file: UploadFile = File(...), lang: str = "hi", x_api_key: str = Header(default="")):
   check_key(x_api_key)
+  whisper_engine = get_stt()
+  if whisper_engine is None:
+    raise HTTPException(503, "Server Whisper STT not loaded. Use browser speech recognition.")
   content = await file.read()
-  segs, _ = stt.transcribe(io.BytesIO(content), language=lang, vad_filter=True, beam_size=1)
+  segs, _ = whisper_engine.transcribe(io.BytesIO(content), language=lang, vad_filter=True, beam_size=1)
   return {"text": " ".join(s.text.strip() for s in segs).strip()}
+
+# ── Register static routes + file mount LAST (after all /v1/* routes) ─────────
+_register_static_routes()
+if _SERVE_STATIC:
+    # Serve styles.css, api.html, github.html etc. at their relative paths.
+    # Must be mounted AFTER all explicit routes so API routes always win.
+    app.mount("/", StaticFiles(directory=str(_CLIENT_DIR), html=True), name="frontend")
