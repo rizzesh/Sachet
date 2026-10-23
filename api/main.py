@@ -1,4 +1,9 @@
 import os, re, time, zlib, torch
+import io
+from fastapi import UploadFile, File
+from faster_whisper import WhisperModel
+
+stt = WhisperModel(os.getenv("STT_MODEL", "small"), device="cpu", compute_type="int8")
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -212,3 +217,8 @@ def end(e: End, x_api_key: str = Header(default="")):
 def health():
     return {"ok": True, "sessions": len(sessions)}
     
+@app.post("/v1/transcribe")
+def transcribe(file: UploadFile = File(...), lang: str = "hi", x_api_key: str = Header(default="")):
+    check_key(x_api_key)
+    segs, _ = stt.transcribe(io.BytesIO(file.file.read()), language=lang, vad_filter=True, beam_size=1)
+    return {"text": " ".join(s.text.strip() for s in segs).strip()}
