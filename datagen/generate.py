@@ -1,561 +1,263 @@
-"""
-Sachet - Synthetic Dialogue Generator (Phase 2)
-Theme: Digital Safety & Cyber Fraud (VBYLD 2027)
-
-Generates realistic Hindi/Hinglish phone call conversations across scam types
-and hard-negative normal calls to train a defensive real-time risk detector.
-Uses Google Gemini API via the google-genai SDK.
-
-Risk scoring is deterministic: the LLM outputs signal tags per caller turn,
-and score_turn() computes a 0-100 risk score using weighted signals.
-"""
-
-import os
-import sys
-
-# Configure UTF-8 encoding for Windows console to handle Hindi (Devanagari) properly
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8")
-
-import json
-import time
-import argparse
-import itertools
-from typing import List, Dict, Any, Optional, Set
+import os, re, json, time, random, argparse, glob
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, ValidationError
 
-# Load environment variables
 load_dotenv()
+MODEL = os.getenv("LLM_MODEL")
 
-# Setup Google GenAI Client
-from google import genai
-from google.genai import types
+SCAMS = [
+    "digital arrest", "fake investment", "KYC/bank block", "courier/customs",
+    "lottery/prize", "tech support", "electricity bill threat",
+    "fake delivery OTP", "UPI refund or sent-by-mistake", "part-time job or task fraud",
+    "loan app threat", "sextortion", "relative in trouble", "fake customer care refund",
+    "SIM disconnection TRAI", "credit card limit upgrade", "marketplace QR scam",
+]
+NORMALS = [
+    "genuine bank call mentioning OTP safety", "delivery call", "relative asking for money",
+    "school", "telemarketer", "doctor's office", "government survey",
+    "genuine delivery asking OTP at the door", "customer care callback you requested",
+    "genuine loan or card sales call", "real electricity dept notice",
+    "genuine merchant refund", "HR or interview call", "insurance renewal reminder",
+]
+VICTIMS = ["trusting elderly person", "suspicious young person",
+           "busy professional", "confused homemaker"]
+LANGS = ["Hinglish in Roman script", "Hinglish in Devanagari script",
+         "mixed Hindi-English in Roman script"]
+PACES = ["slow build-up", "fast pressure"]
 
-
-# ---------------------------------------------------------
-# Signal-Based Risk Scoring Constants & Function
-# ---------------------------------------------------------
-
-# Base risk that any unsolicited call starts at
-BASE = 12
-
-# Scam-indicative signal weights (positive = raises risk)
-# Benign-indicative signal weights (negative = lowers risk)
-W = {
-    "authority_claim": 12,
-    "arrest_or_legal_threat": 15,
-    "urgency_deadline": 10,
-    "secrecy_isolation": 14,
-    "stay_on_call_or_video": 10,
-    "asks_otp_pin_cvv": 18,
-    "asks_money_transfer": 20,
-    "unsolicited_link_or_app": 14,
-    "guaranteed_returns": 12,
-    "discourages_verification": 10,
-    "tells_to_verify_officially": -15,
-    "says_never_share_otp": -18,
-    "accepts_callback_or_branch_visit": -12,
-    "consistent_benign_details": -8,
+HINTS = {
+    "digital arrest": "caller poses as police, CBI or TRAI, claims a case is registered against the person, keeps them on a call or video call and demands money for 'verification'",
+    "fake investment": "caller or 'advisor' promises guaranteed high returns from a trading or crypto group and pushes the person to deposit money quickly",
+    "KYC/bank block": "caller claims to be from a bank and says KYC is pending or the account will be blocked, and pushes for an OTP or a link",
+    "courier/customs": "caller says a parcel in the person's name is held at customs or contains something illegal and threatens legal action unless a payment is made",
+    "lottery/prize": "caller says the person won a prize or lottery and asks for a fee or personal details to release it",
+    "tech support": "caller claims the phone or computer is hacked or infected and asks to install a remote-access app",
+    "electricity bill threat": "caller poses as an electricity department officer, says the bill is not updated and power will be cut tonight, and asks to install an app or pay immediately",
+    "fake delivery OTP": "caller says a parcel has arrived for something the person never ordered, insists it is theirs, and asks for an OTP before handing it over",
+    "UPI refund or sent-by-mistake": "caller says money was sent to the person by mistake or a refund is due, and asks them to approve a UPI request or share a PIN",
+    "part-time job or task fraud": "caller offers easy online work with daily payouts, asks for a small deposit or 'task fee' first, and then asks for more",
+    "loan app threat": "caller from a loan app threatens to shame the person in front of their contacts unless an inflated amount is repaid immediately",
+    "sextortion": "caller claims to have private photos or a recorded video of the person and threatens to leak them unless money is paid; keep it non-explicit and refer only to 'private photos or video' in general terms",
+    "relative in trouble": "caller pretends to be a relative or friend in an emergency and asks for urgent money while asking the person not to tell others",
+    "fake customer care refund": "caller poses as customer care of a shopping or payment app, offers a refund, and asks the person to install a screen-sharing app or approve a payment",
+    "SIM disconnection TRAI": "caller claims to be from the telecom regulator and says the person's number will be disconnected due to illegal activity unless they verify details",
+    "credit card limit upgrade": "caller offers a free credit-limit increase and asks for card details and an OTP",
+    "marketplace QR scam": "a 'buyer' on a resale site says they will pay and asks the seller to scan a QR code or approve a request to 'receive' the money",
+    "genuine bank call mentioning OTP safety": "a real bank executive informs about a suspicious transaction, tells the person never to share an OTP, and asks them to call the number on the back of the card",
+    "delivery call": "a delivery agent asks for the address or landmark for an order the person really placed",
+    "relative asking for money": "a real family member the person knows asks for help with money, with personal details only a relative would know",
+    "school": "a school teacher or office calls about fees, a meeting or a child's attendance",
+    "telemarketer": "a salesperson pitches a product politely, asks for no OTP, does not pressure the person and accepts a no",
+    "doctor's office": "a clinic receptionist confirms or reschedules an appointment; any payment is made at the clinic",
+    "government survey": "a surveyor asks general questions for a survey and asks for no money or OTP",
+    "genuine delivery asking OTP at the door": "a delivery agent for an order the person really placed says they are at the gate and asks for the delivery OTP that arrived by SMS for that order",
+    "customer care callback you requested": "a customer-care executive returns a call about a complaint the person registered and asks only for the ticket number",
+    "genuine loan or card sales call": "a bank sales agent offers a loan or card, explains the offer, takes no OTP or money on the call, and says to visit the branch or website",
+    "real electricity dept notice": "the electricity department informs about a planned outage or a meter reading visit, asks for no money and says to use the official app or office",
+    "genuine merchant refund": "a merchant support agent says a refund for a cancelled order will arrive in the original payment method in a few days and asks for nothing",
+    "HR or interview call": "an HR executive schedules an interview, asks for a resume and availability, and asks for no money",
+    "insurance renewal reminder": "an insurance agent reminds about a policy renewal date and says to pay through the official site or at the office",
 }
 
-# All valid signal names (for validation)
-VALID_SIGNALS = set(W.keys())
-
-# Decay factor: older signals lose influence
-DECAY = 0.85
-
-
-def score_turn(signals_so_far: List[List[str]]) -> int:
-    """
-    Deterministically computes a 0-100 risk score from all signals
-    accumulated up to the current turn.
-
-    signals_so_far: list of signal-lists, one per caller turn so far.
-    Each inner list contains signal name strings for that turn.
-
-    Uses exponential decay (older turns matter less), sums weighted
-    signals, adds BASE, and clamps to [0, 100].
-    """
-    raw = BASE
-    n = len(signals_so_far)
-    for i, turn_signals in enumerate(signals_so_far):
-        age = n - 1 - i  # 0 for most recent, higher for older
-        weight_multiplier = DECAY ** age
-        for sig in turn_signals:
-            if sig in W:
-                raw += W[sig] * weight_multiplier
-    # Clamp to [5, 95] — ongoing calls always have uncertainty,
-    # risk should never be absolute 0 or 100 mid-conversation
-    return max(5, min(95, int(round(raw))))
-
-
-# ---------------------------------------------------------
-# Pydantic Schemas for JSON Validation & Constrained Decoding
-# ---------------------------------------------------------
-
-class Turn(BaseModel):
-    speaker: str = Field(description="Must be 'caller' or 'victim'")
-    text: str = Field(description="Utterance text in Hindi (Devanagari), Hinglish (Roman), or mixed Hindi-English")
-    signals: List[str] = Field(
-        default_factory=list,
-        description="List of signal tags for caller turns (empty for victim turns). Valid signals: authority_claim, arrest_or_legal_threat, urgency_deadline, secrecy_isolation, stay_on_call_or_video, asks_otp_pin_cvv, asks_money_transfer, unsolicited_link_or_app, guaranteed_returns, discourages_verification, tells_to_verify_officially, says_never_share_otp, accepts_callback_or_branch_visit, consistent_benign_details"
-    )
-
-class Conversation(BaseModel):
-    label: str = Field(description="'scam' or 'normal'")
-    scenario: str
-    language: str
-    victim: str
-    pace: str
-    turns: List[Turn]
-
-class LLMResponse(BaseModel):
-    conversations: List[Conversation]
-
-
-# ---------------------------------------------------------
-# Output schema (what we write to JSONL — includes computed risk)
-# ---------------------------------------------------------
-
-class OutputTurn(BaseModel):
-    speaker: str
-    text: str
-    signals: List[str]
-    risk: int = Field(description="Computed 0-100 risk score")
-
-class OutputConversation(BaseModel):
-    label: str
-    scenario: str
-    language: str
-    victim: str
-    pace: str
-    turns: List[OutputTurn]
-
-
-# ---------------------------------------------------------
-# LLM Caller Function
-# ---------------------------------------------------------
-
-def call_llm(prompt: str, model_name: Optional[str] = None) -> str:
-    """
-    Calls the Google Gemini LLM using the google-genai SDK.
-    Reads LLM_API_KEY and LLM_MODEL from .env.
-    Enforces structured JSON output matching LLMResponse schema.
-    """
-    api_key = os.getenv("LLM_API_KEY")
-    if not api_key:
-        raise ValueError("LLM_API_KEY not found in environment or .env file.")
-
-    if not model_name:
-        model_name = os.getenv("LLM_MODEL", "gemini-3.5-flash-lite")
-
-    client = genai.Client(api_key=api_key)
-
-    config = types.GenerateContentConfig(
-        response_mime_type="application/json",
-        response_schema=LLMResponse,
-        temperature=0.75,
-    )
-
-    response = client.models.generate_content(
-        model=model_name,
-        contents=prompt,
-        config=config,
-    )
-
-    if not response.text:
-        raise ValueError("Empty response received from LLM.")
-
-    return response.text.strip()
-
-
-# ---------------------------------------------------------
-# Scenario Grid Definitions
-# ---------------------------------------------------------
-
-SCAM_TYPES = [
-    "digital arrest",
-    "KYC/bank block",
-    "fake investment",
-    "courier/customs",
-    "electricity bill threat",
-    "lottery/prize",
-    "tech support",
+SIGNALS = [
+    "authority_claim", "arrest_or_legal_threat", "urgency_deadline", "secrecy_isolation",
+    "stay_on_call_or_video", "asks_otp_pin_cvv", "asks_money_transfer",
+    "unsolicited_link_or_app", "guaranteed_returns", "discourages_verification",
+    "tells_to_verify_officially", "says_never_share_otp",
+    "accepts_callback_or_branch_visit", "consistent_benign_details",
+    "asks_qr_or_upi_approval", "advance_fee_or_deposit", "blackmail_or_leak_threat",
+    "impersonates_known_person", "requests_remote_access", "request_tied_to_own_order",
 ]
 
-NORMAL_TYPES = [
-    "genuine bank call mentioning OTP safety",
-    "delivery call",
-    "relative asking for money",
-    "telemarketer",
-    "school",
-    "doctor's office",
-    "government survey",
-]
+BASE = 12
+W = {
+    "authority_claim": 12, "arrest_or_legal_threat": 15, "urgency_deadline": 10,
+    "secrecy_isolation": 14, "stay_on_call_or_video": 10, "asks_otp_pin_cvv": 18,
+    "asks_money_transfer": 20, "unsolicited_link_or_app": 12, "guaranteed_returns": 14,
+    "discourages_verification": 12, "tells_to_verify_officially": -15,
+    "says_never_share_otp": -10, "accepts_callback_or_branch_visit": -12,
+    "consistent_benign_details": -8,
+    "asks_qr_or_upi_approval": 18, "advance_fee_or_deposit": 16,
+    "blackmail_or_leak_threat": 18, "impersonates_known_person": 12,
+    "requests_remote_access": 16, "request_tied_to_own_order": -12,
+}
 
-VICTIM_PROFILES = [
-    "trusting elderly person",
-    "suspicious young person",
-    "busy professional",
-    "confused homemaker",
-]
-
-LANGUAGES = [
-    "Hinglish in Roman script",
-    "Hinglish in Devanagari script",
-    "Mixed Hindi-English in Roman script",
-]
-
-PACES = [
-    "slow build-up",
-    "fast pressure",
-]
-
-TURN_LENGTHS = [8, 16, 30]
-
-
-# ---------------------------------------------------------
-# Domain Guidance (Authentic UP Cybercrime & Police Modus Operandi)
-# ---------------------------------------------------------
-
-DOMAIN_GUIDANCE = """
-AUTHENTIC LANGUAGE & VOCABULARY GUIDELINES (REAL CASUAL SPOKEN PHONE CALLS):
-1. For 'Hinglish in Devanagari script':
-   - MUST be CASUAL spoken Hindi as spoken in everyday phone conversations.
-   - ABSOLUTELY NO formal, bookish, or shuddh Hindi.
-   - English words that people normally say in English MUST stay English but be written in Devanagari script:
-     (अकाउंट, ओटीपी, ट्रांसफर, पुलिस, वेरिफिकेशन, कॉल, लिंक, कस्टमर, नंबर, ब्लॉक, ब्रांच, डिटेल्स, ऐप, पासवर्ड, मैसेज, पार्सल).
-   - Use short sentences, natural fillers: "देखिए", "सर", "अरे", "सुनिए", "ठीक है ना", "अरे यार", "भैया", "हाँ जी".
-   - Natural code-switching mix like real phone calls.
-   - STRICTLY AVOID formal words: Do NOT use "कृपया", "आपका स्वागत है", "अतः", "तत्पश्चात", "पंजीकृत", "दूरसंचार विभाग", "अवैध वित्तीय गतिविधियों".
-   - PREFER casual words: "प्लीज", "ठीक है", "तो", "फिर", "बंद हो जाएगा", "पैसे कट जाएंगे", "चेक कर लीजिए".
-   - RIGHT EXAMPLE:
-     "सर, आपका KYC अपडेट नहीं है, आज रात तक अकाउंट ब्लॉक हो जाएगा। ओटीपी बता दीजिए ना।"
-   - WRONG EXAMPLE (Too formal - DO NOT USE):
-     "कृपया ध्यान दें, आपके खाते का पुनर्सत्यापन अनिवार्य है अन्यथा खाता निष्क्रिय कर दिया जाएगा।"
-
-2. For 'Hinglish in Roman script' & 'Mixed Hindi-English in Roman script':
-   - Natural everyday Hinglish spoken in UP/India with natural code-switching.
-   - Example: "Sir, aapka KYC pending hai, aaj raat tak account freeze ho jayega. Please OTP share kar dijiye na."
-   - Avoid textbook phrases. Keep it colloquial, urgent or conversational, and authentic.
-
-REALISTIC CONTEXT (UP Police & Cybercrime Helpline 1930 Advisories):
-1. Digital Arrest Scams:
-   - Callers claim to be from Telecom Regulatory Authority of India (TRAI), Alambagh Police Station (Lucknow), CBI, ED, ATS, or Barakhamba Police Station.
-   - Fake officers like SI Sunil Kumar Mishra or Inspector Rathore.
-   - Tell victims their mobile number/Aadhaar is linked to money laundering (e.g. Nawab Malik case or 17 complaints) and will be disconnected in 4 hours.
-   - Demand victim switch to WhatsApp video call with fake police station background, demand 360-degree camera inspection to ensure victim is alone in the room.
-   - Present fake Supreme Court or TRAI letters (often with typos), play walkie-talkie sounds in background.
-   - Coerce victim to transfer all funds to 'RBI safe account' or 'government verification account' promising a clean-chit refund; pressure breaking FDs or taking loans.
-   - REALITY: Police never do 'digital arrest' (not in BNSS/law), never take statements via video call, never send arrest warrants on WhatsApp, and never ask for funds transfer.
-
-2. Hard Negative / Normal Calls:
-   - Genuine bank calls: Actively caution the customer that bank staff NEVER ask for OTP, PIN, or CVV. Direct customer to call the number on the back of the debit card or visit their home branch.
-   - Real deliveries: Delivery partner confirming landmark in UP localities (Gomti Nagar, Indira Nagar, Hazratganj, Civil Lines) without asking for OTPs or APK downloads.
-   - Relatives: Calling naturally for urgent family assistance or loan request without fake legal threats.
-   - Clinics / Schools: Legitimate appointment reminders or parent-teacher meeting notices.
+SIGNAL_NOTES = """Signal meanings (tag a signal only when it is clearly present in that caller line):
+- asks_qr_or_upi_approval: asks to scan a QR code or approve a UPI collect request to "receive" money
+- advance_fee_or_deposit: asks for a fee, deposit or registration payment before a job, loan or prize
+- blackmail_or_leak_threat: threatens to leak private photos, videos or information
+- impersonates_known_person: claims to be a relative or friend in trouble
+- requests_remote_access: asks to install a screen-sharing or remote-control app
+- request_tied_to_own_order: the request (for example an OTP) relates to an order, appointment or request the person really made, and is handled in person or through an official channel
+- tells_to_verify_officially: tells the person to check through an official number, app or office
+- says_never_share_otp: warns the person never to share an OTP, PIN or CVV
+- accepts_callback_or_branch_visit: is fine with the person calling back or visiting a branch
+- consistent_benign_details: details match what the person really did (order, address, name)
 """
 
+STYLE = """Language style:
+- Casual spoken phone-call language, NOT formal or shuddh Hindi.
+- For Devanagari Hinglish, write English words people normally say in English in Devanagari script (अकाउंट, ओटीपी, ट्रांसफर, पुलिस, वेरिफिकेशन, कॉल, लिंक). Use short sentences and fillers like देखिए, सर, अरे, ठीक है ना.
+- Avoid formal words like कृपया, अतः, तत्पश्चात. Prefer प्लीज, ठीक है, तो, फिर."""
 
-def build_prompt(
-    scenario: str,
-    label: str,
-    victim: str,
-    language: str,
-    pace: str,
-    target_turns: int,
-) -> str:
-    """
-    Constructs the prompt for generating 2 distinct realistic conversations.
-    Now asks for 'signals' per caller turn instead of a 'risk' number.
-    """
-    prompt = f"""You are a specialized training data generator for "Sachet", a defensive real-time scam-call risk detection service for Hindi/Hinglish calls.
-
-Generate exactly 2 distinct, highly realistic phone conversations based on these specifications:
-- Label: {label.upper()} ({label})
-- Scenario: {scenario}
-- Victim Profile: {victim}
-- Language: {language}
-- Escalation Pace: {pace}
-- Target Length: approximately {target_turns} turns (total turns alternating between caller and victim).
-
-{DOMAIN_GUIDANCE}
-
-CRITICAL RULES:
-1. Authentic Indian names (e.g., Ramesh, Sunita, Rajesh, Priya, Alok, Pooja, Vikram, Geeta, Veerendra) and UP cities (Lucknow, Kanpur, Varanasi, Prayagraj, Aligarh, Meerut, Bareilly, Agra).
-2. TONE & VOCABULARY INSTRUCTION FOR '{language}':
-   - If 'Hinglish in Devanagari script': Write CASUAL spoken Hindi, NEVER formal/shuddh Hindi. Common English words must stay in English transliterated to Devanagari (अकाउंट, ओटीपी, ट्रांसफर, पुलिस, वेरिफिकेशन, कॉल, लिंक, कस्टमर, नंबर, ब्लॉक, ऐप). Use short sentences and fillers ("देखिए", "सर", "अरे", "सुनिए", "ठीक है ना", "भैया"). Avoid formal words like "कृपया", "आपका स्वागत है", "अतः", "तत्पश्चात", "पंजीकृत". Prefer "प्लीज", "ठीक है", "तो", "फिर".
-   - Target style example: "सर, आपका KYC अपडेट नहीं है, आज रात तक अकाउंट ब्लॉक हो जाएगा। ओटीपी बता दीजिए ना।"
-   - If 'Hinglish in Roman script' or 'Mixed Hindi-English in Roman script': Use realistic natural conversational code-switching (e.g. "Sir, aapka KYC pending hai, aaj raat tak account freeze ho jayega. Please OTP share kar dijiye na.").
-3. Defensive & non-operational: Realistic dialogues for detection training, no exploitative instructions.
-4. Vary the openings and expressions. Do not repeat formulas across conversations.
-5. Each turn must have:
-   - "speaker": "caller" or "victim"
-   - "text": The spoken line in {language}.
-   - "signals": A list of signal tags for CALLER turns only. For VICTIM turns, use an empty list [].
-     Valid signal names (use ONLY from this list, pick all that apply for that turn, or empty list if none):
-       authority_claim, arrest_or_legal_threat, urgency_deadline, secrecy_isolation,
-       stay_on_call_or_video, asks_otp_pin_cvv, asks_money_transfer, unsolicited_link_or_app,
-       guaranteed_returns, discourages_verification,
-       tells_to_verify_officially, says_never_share_otp, accepts_callback_or_branch_visit,
-       consistent_benign_details.
-   - Do NOT output any "risk" number. Only output "signals".
-6. Output must follow the LLMResponse schema with exactly 2 conversations.
-"""
-    return prompt
+_client = None
 
 
-# ---------------------------------------------------------
-# Normalization & Validation Helper
-# ---------------------------------------------------------
-
-def sanitize_conversation(conv_data: Dict[str, Any], default_label: str, default_scenario: str, default_language: str = "Hinglish") -> Dict[str, Any]:
-    """Sanitizes and bounds fields to ensure strict adherence to dataset standards."""
-    clean_turns = []
-    for t in conv_data.get("turns", []):
-        raw_speaker = str(t.get("speaker", "caller")).lower().strip()
-        speaker = "victim" if "victim" in raw_speaker or "user" in raw_speaker else "caller"
-        text = str(t.get("text", "")).strip()
-
-        # Extract and validate signals
-        raw_signals = t.get("signals", [])
-        if not isinstance(raw_signals, list):
-            raw_signals = []
-        # Filter to only valid signal names
-        signals = [s for s in raw_signals if s in VALID_SIGNALS]
-        # Victim turns should have no signals
-        if speaker == "victim":
-            signals = []
-
-        if text:
-            clean_turns.append({"speaker": speaker, "text": text, "signals": signals})
-
-    return {
-        "label": conv_data.get("label", default_label).lower(),
-        "scenario": conv_data.get("scenario", default_scenario),
-        "language": conv_data.get("language") or default_language,
-        "victim": conv_data.get("victim", "general"),
-        "pace": conv_data.get("pace", "standard"),
-        "turns": clean_turns,
-    }
+def add_scores(turns):
+    s = BASE
+    for t in turns:
+        if t["speaker"] == "caller":
+            s += sum(W.get(x, 0) for x in t.get("signals", []))
+        s = max(8, min(92, s))
+        t["risk_score"] = s
+    return turns
 
 
-def add_risk_scores(conv_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Takes a sanitized conversation dict (with 'signals' per turn)
-    and computes a deterministic 'risk' score (0-100) for each turn
-    using score_turn() based on accumulated caller signals.
-    """
-    caller_signals_so_far = []
-    scored_turns = []
-
-    for turn in conv_dict["turns"]:
-        if turn["speaker"] == "caller" and turn["signals"]:
-            caller_signals_so_far.append(turn["signals"])
-
-        risk = score_turn(caller_signals_so_far)
-        scored_turns.append({
-            "speaker": turn["speaker"],
-            "text": turn["text"],
-            "signals": turn["signals"],
-            "risk": risk,
-        })
-
-    return {
-        "label": conv_dict["label"],
-        "scenario": conv_dict["scenario"],
-        "language": conv_dict["language"],
-        "victim": conv_dict["victim"],
-        "pace": conv_dict["pace"],
-        "turns": scored_turns,
-    }
+def build_prompt(label, scenario, victim, lang, pace, n_turns, n, examples):
+    hint = HINTS.get(scenario, "")
+    if label == "scam":
+        kind = f"a SCAM call (for training a defensive scam detector). Typical script: {hint}"
+        extra = "Some callers are polite and slow, some are aggressive. The victim may doubt or ask questions, but the caller keeps pushing."
+    else:
+        kind = f"a GENUINE, harmless call. What happens: {hint}"
+        extra = "The caller may sound urgent or mention OTP, money or police in a legitimate way. Tag the safe behaviour honestly (verification, never sharing OTP, callback, details matching a real order)."
+    return f"""Write {n} different realistic phone conversations. Each is {kind}.
+Scenario: {scenario}. Receiver: {victim} (an adult). Language: {lang}. Pace: {pace}.
+Each conversation has about {n_turns} turns, alternating caller and victim.
+Use Indian names, UP cities (Lucknow, Kanpur, Varanasi, Prayagraj, Gorakhpur) and realistic amounts.
+{extra}
+Vary the openings; do not start the conversations the same way. Keep it realistic but non-operational: no working instructions, no real phone numbers or accounts. No sexual, explicit or violent content.
+{STYLE}
+For each CALLER turn add "signals": a list chosen ONLY from {SIGNALS}.
+Use [] if none apply. Victim turns have no signals. Do NOT output any risk number.
+{SIGNAL_NOTES}
+Style examples (match the realism, do not copy wording):
+{examples}
+Return ONLY a JSON list of {n} objects shaped like {{"turns": [{{"speaker": "caller", "text": "...", "signals": []}}, {{"speaker": "victim", "text": "...", "signals": []}}]}}"""
 
 
-# ---------------------------------------------------------
-# Generation Engine with Resume, Validation, and Retries
-# ---------------------------------------------------------
-
-def load_existing_signatures(output_file: str) -> Set[str]:
-    """
-    Loads unique signatures of already generated calls for resume support.
-    Signature format: scenario|victim|language|pace|label
-    """
-    signatures = set()
-    if not os.path.exists(output_file):
-        return signatures
-
-    with open(output_file, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                data = json.loads(line)
-                sig = f"{data.get('scenario')}|{data.get('victim')}|{data.get('language')}|{data.get('pace')}|{data.get('label')}"
-                signatures.add(sig)
-            except Exception:
-                continue
-    return signatures
+def call_llm(prompt):
+    global _client
+    if _client is None:
+        from google import genai
+        _client = genai.Client(api_key=os.getenv("LLM_API_KEY"))
+    r = _client.models.generate_content(
+        model=MODEL, contents=prompt,
+        config={"response_mime_type": "application/json", "temperature": 1.0})
+    return r.text
 
 
-def log_skip(skip_log_file: str, combo: Dict[str, Any], reason: str):
-    """Logs skipped or failed combinations to disk."""
-    os.makedirs(os.path.dirname(skip_log_file), exist_ok=True)
-    entry = {
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "combo": combo,
-        "reason": reason,
-    }
-    with open(skip_log_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+def parse(text):
+    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
+    data = json.loads(text)
+    if isinstance(data, dict):
+        data = data.get("conversations", [data])
+    return data
 
 
-def generate_dataset(
-    output_file: str = "data/raw/calls.jsonl",
-    skip_log_file: str = "data/raw/skipped_log.jsonl",
-    limit: Optional[int] = None,
-    delay: float = 2.0,
-    max_retries: int = 3,
-):
-    """
-    Iterates through scenario grid, calls Gemini LLM, validates output,
-    computes deterministic risk scores from signals, and persists to calls.jsonl.
-    """
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    existing_sigs = load_existing_signatures(output_file)
-    print(f"[*] Found {len(existing_sigs)} existing scenario signatures in {output_file}")
-
-    # Build interleaved grid that alternates on EVERY step:
-    # 1. Scenarios: alternates scam and normal calls across all 14 types
-    # 2. Victims: cycles (elderly -> young -> professional -> homemaker)
-    # 3. Languages: cycles (Hinglish Roman -> Hinglish Devanagari -> Mixed Roman)
-    # 4. Paces: cycles (slow build-up -> fast pressure)
-    # 5. Lengths: cycles (8 -> 16 -> 30)
-    scams = [(s, "scam") for s in SCAM_TYPES]
-    normals = [(n, "normal") for n in NORMAL_TYPES]
-    interleaved_scenarios = [item for pair in zip(scams, normals) for item in pair]
-    
-    grid = []
-    length_cycle = itertools.cycle(TURN_LENGTHS)
-    
-    for v_offset in range(len(VICTIM_PROFILES)):
-        for l_offset in range(len(LANGUAGES)):
-            for p_offset in range(len(PACES)):
-                for s_idx, (scenario, label) in enumerate(interleaved_scenarios):
-                    victim = VICTIM_PROFILES[(s_idx + v_offset) % len(VICTIM_PROFILES)]
-                    lang = LANGUAGES[(s_idx + l_offset) % len(LANGUAGES)]
-                    pace = PACES[(s_idx + p_offset) % len(PACES)]
-                    target_len = next(length_cycle)
-                    grid.append({
-                        "scenario": scenario,
-                        "label": label,
-                        "victim": victim,
-                        "language": lang,
-                        "pace": pace,
-                        "target_turns": target_len,
-                    })
-
-    print(f"[*] Total grid combinations: {len(grid)}")
-
-    generated_count = 0
-    combo_idx = 0
-
-    for combo in grid:
-        if limit is not None and generated_count >= limit:
-            print(f"[*] Reached requested limit of {limit} conversations. Halting as instructed.")
-            break
-
-        sig = f"{combo['scenario']}|{combo['victim']}|{combo['language']}|{combo['pace']}|{combo['label']}"
-        if sig in existing_sigs:
-            # Already generated, resume next
+def validate(calls):
+    ok = []
+    for c in calls:
+        if not isinstance(c, dict):
             continue
-
-        combo_idx += 1
-        print(f"\n[{combo_idx}] Generating: [{combo['label'].upper()}] '{combo['scenario']}' | {combo['victim']} | {combo['language']} | {combo['pace']} (~{combo['target_turns']} turns)")
-
-        prompt = build_prompt(
-            scenario=combo["scenario"],
-            label=combo["label"],
-            victim=combo["victim"],
-            language=combo["language"],
-            pace=combo["pace"],
-            target_turns=combo["target_turns"],
-        )
-
-        success = False
-        for attempt in range(1, max_retries + 1):
-            try:
-                raw_json = call_llm(prompt)
-                parsed_data = json.loads(raw_json)
-
-                # Validate and sanitize each conversation
-                validated_convs = []
-                for raw_conv in parsed_data.get("conversations", []):
-                    clean_dict = sanitize_conversation(raw_conv, combo["label"], combo["scenario"], combo["language"])
-                    # Validate against LLM schema (signals, no risk)
-                    validated_model = Conversation.model_validate(clean_dict)
-                    clean = validated_model.model_dump()
-                    # Compute deterministic risk scores from signals
-                    scored = add_risk_scores(clean)
-                    validated_convs.append(scored)
-
-                if not validated_convs:
-                    raise ValueError("No conversations found in LLM output")
-
-                # Append to calls.jsonl
-                with open(output_file, "a", encoding="utf-8") as f_out:
-                    for conv_dict in validated_convs:
-                        f_out.write(json.dumps(conv_dict, ensure_ascii=False) + "\n")
-                        generated_count += 1
-                        # Show signal + risk summary for the conversation
-                        total_signals = sum(len(t["signals"]) for t in conv_dict["turns"])
-                        final_risk = conv_dict["turns"][-1]["risk"] if conv_dict["turns"] else 0
-                        print(f"    -> Saved [{conv_dict['label']}] {len(conv_dict['turns'])} turns, {total_signals} signals, final_risk={final_risk}. (Total saved: {generated_count})")
-                        if limit is not None and generated_count >= limit:
-                            break
-
-                existing_sigs.add(sig)
-                success = True
+        turns = c.get("turns")
+        if not isinstance(turns, list) or len(turns) < 4:
+            continue
+        clean, good, n_caller = [], True, 0
+        for t in turns:
+            if not isinstance(t, dict) or t.get("speaker") not in ("caller", "victim") \
+                    or not str(t.get("text", "")).strip():
+                good = False
                 break
+            sig = []
+            if t["speaker"] == "caller":
+                n_caller += 1
+                raw = t.get("signals", [])
+                sig = [x for x in raw if x in SIGNALS] if isinstance(raw, list) else []
+            clean.append({"speaker": t["speaker"], "text": str(t["text"]).strip(), "signals": sig})
+        if good and n_caller >= 2:
+            c["turns"] = clean
+            ok.append(c)
+    return ok
 
-            except (json.JSONDecodeError, ValidationError) as e:
-                print(f"    [!] Attempt {attempt}/{max_retries} Schema error: {e}")
-                if attempt == max_retries:
-                    log_skip(skip_log_file, combo, f"Validation failure: {str(e)}")
+
+def load_done(pattern):
+    done = set()
+    for p in glob.glob(pattern):
+        with open(p, encoding="utf-8-sig") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    c = json.loads(line)
+                    done.add((c["label"], c["scenario"], c["victim"], c["language"], c["pace"]))
+                except Exception:
+                    continue
+    return done
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--limit", type=int, default=0, help="max combinations to run")
+    ap.add_argument("--delay", type=float, default=4.0)
+    ap.add_argument("--only", default="", help="comma-separated parts of scenario names")
+    ap.add_argument("--victims", type=int, default=4, help="use only the first N victim profiles")
+    ap.add_argument("--n", type=int, default=2, help="conversations per combination")
+    ap.add_argument("--out", default="data/raw/calls.jsonl")
+    a = ap.parse_args()
+
+    out_dir = os.path.dirname(a.out) or "."
+    os.makedirs(out_dir, exist_ok=True)
+    log = os.path.join(out_dir, "errors.log")
+
+    examples = "(none)"
+    if os.path.exists("datagen/examples.json"):
+        examples = open("datagen/examples.json", encoding="utf-8").read()[:6000]
+
+    done = load_done(os.path.join(out_dir, "calls*.jsonl"))
+    only = [x.strip().lower() for x in a.only.split(",") if x.strip()]
+    pairs = [("scam", s) for s in SCAMS] + [("normal", s) for s in NORMALS]
+    pairs = [(l, s) for l, s in pairs if not only or any(o in s.lower() for o in only)]
+    grid = [(l, s, v, lg, p) for l, s in pairs for v in VICTIMS[:a.victims]
+            for lg in LANGS for p in PACES]
+    random.shuffle(grid)
+    grid = [g for g in grid if g not in done]
+    if a.limit:
+        grid = grid[:a.limit]
+    print(f"{len(grid)} combinations to run, saving to {a.out}")
+
+    fails = 0
+    for i, (l, s, v, lg, p) in enumerate(grid, 1):
+        prompt = build_prompt(l, s, v, lg, p, random.choice([8, 16, 30]), a.n, examples)
+        saved = False
+        for attempt in range(3):
+            try:
+                calls = validate(parse(call_llm(prompt)))
+                if not calls:
+                    raise ValueError("no valid conversations")
+                with open(a.out, "a", encoding="utf-8") as f:
+                    for c in calls:
+                        c.update(label=l, scenario=s, victim=v, language=lg, pace=p)
+                        c["turns"] = add_scores(c["turns"])
+                        f.write(json.dumps(c, ensure_ascii=False) + "\n")
+                print(f"[{i}/{len(grid)}] ok: {l} | {s} | {v} | {lg} | {len(calls)} saved")
+                saved = True
+                break
             except Exception as e:
-                print(f"    [!] Attempt {attempt}/{max_retries} API error: {e}")
-                if attempt == max_retries:
-                    log_skip(skip_log_file, combo, f"API error: {str(e)}")
-            
-            # Backoff before retry
-            time.sleep(2.0 * attempt)
+                msg = str(e)
+                if attempt == 2:
+                    with open(log, "a", encoding="utf-8") as f:
+                        f.write(f"{(l, s, v, lg, p)}: {msg[:300]}\n")
+                    print(f"[{i}/{len(grid)}] skipped: {msg[:120]}")
+                else:
+                    quota = any(k in msg for k in ("429", "RESOURCE_EXHAUSTED", "quota"))
+                    time.sleep(30 * (attempt + 1) if quota else 2 ** (attempt + 1))
+        fails = 0 if saved else fails + 1
+        if fails >= 6:
+            print("6 failures in a row, probably the free-tier quota. Stopping; rerun later to resume.")
+            break
+        time.sleep(a.delay)
 
-        # Rate limiting delay
-        time.sleep(delay)
-
-    print(f"\n[✓] Run completed. Generated {generated_count} new conversations. Total signatures: {len(existing_sigs)}.")
-
-
-# ---------------------------------------------------------
-# CLI Entrypoint
-# ---------------------------------------------------------
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate synthetic Hindi/Hinglish scam and normal call dialogues.")
-    parser.add_argument("--limit", type=int, default=None, help="Maximum number of conversations to generate in this run.")
-    parser.add_argument("--delay", type=float, default=2.0, help="Delay in seconds between LLM calls to respect rate limits.")
-    parser.add_argument("--output", type=str, default="data/raw/calls.jsonl", help="Output JSONL path.")
-    parser.add_argument("--skip-log", type=str, default="data/raw/skipped_log.jsonl", help="Path for logging failed combinations.")
-
-    args = parser.parse_args()
-
-    generate_dataset(
-        output_file=args.output,
-        skip_log_file=args.skip_log,
-        limit=args.limit,
-        delay=args.delay,
-    )
-    
+    main()
