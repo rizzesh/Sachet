@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How Sachet Works — Architecture & Methodology</title>
+  <meta name="description" content="Understand the real-time AI architecture, MuRIL transformer, 20-signal psychological detector, and privacy guarantees behind Sachet.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Emergency Helpline Top Banner -->
+  <aside class="emergency-banner">
+    <span>🚨 <strong>Suspect fraud or cyber crime?</strong> Call National Cyber Helpline <strong>1930</strong> immediately or report at <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">cybercrime.gov.in</a></span>
+  </aside>
+
+  <!-- Site Navigation -->
+  <header class="site-nav">
+    <div class="container nav-wrapper">
+      <a href="index.html" class="brand-group">
+        <div class="brand-logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <div class="brand-name">
+          Sachet <span class="hindi">[सचेत]</span>
+        </div>
+        <span class="brand-badge">Civic Shield</span>
+      </a>
+
+      <nav>
+        <ul class="nav-links">
+          <li><a href="how-it-works.html" class="nav-link active">How it Works</a></li>
+          <li><a href="github.html" class="nav-link">GitHub</a></li>
+          <li><a href="api.html" class="nav-link">API</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="index.html#demo" class="btn btn-primary" style="padding: 8px 16px; font-size: 13px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Try Live Demo
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Subpage Header -->
+  <section class="subpage-hero">
+    <div class="container">
+      <div class="pill-badge">
+        <span class="pulse-dot"></span>
+        Technical Blueprint
+      </div>
+      <h1 class="subpage-title">How Sachet Works</h1>
+      <p class="subpage-subtitle">
+        Sachet inspects the conversational arc and psychological coercion behind phone scams in Hindi & Hinglish, operating with a strict "Warn, Never Block" defensive philosophy.
+      </p>
+    </div>
+  </section>
+
+  <!-- Main Content Cards -->
+  <section class="doc-section">
+    <div class="container" style="max-width: 920px;">
+
+      <!-- Card 1: Core Philosophy -->
+      <div class="doc-card">
+        <h2>1. Core Principle: "Warn, Never Block"</h2>
+        <p>
+          Sachet is engineered as a defensive co-pilot for the citizen, not an authoritarian telecom filter. 
+        </p>
+        <p>
+          Calls are <strong>never forcibly dropped or interrupted</strong>. Instead, as the dialogue unfolds, Sachet provides transparent, contextual warnings in simple conversational Hindi (e.g., <em>"Digital arrest scam: police/CBI ka naam aur paise maangna ek hi script hai"</em>). This empowers ordinary citizens and senior citizens to identify deception themselves and hang up with confidence.
+        </p>
+      </div>
+
+      <!-- Card 2: 4-Stage Detection Pipeline -->
+      <div class="doc-card">
+        <h2>2. Four-Stage Detection Pipeline</h2>
+        <p>
+          Rather than brittle keyword blacklists (which scammers effortlessly evade by rephrasing), Sachet evaluates the temporal escalation of the call through four integrated stages:
+        </p>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:24px 0;">
+          <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:18px;">
+            <div style="color:var(--amber-light); font-weight:700; font-size:14px; margin-bottom:6px;">Stage 1: Text-Only Ingestion</div>
+            <div style="font-size:13px; color:var(--text-muted); line-height:1.5;">
+              Speech is transcribed on-device or streamed chunk-by-chunk. Raw voice recordings are discarded immediately after transcription.
+            </div>
+          </div>
+
+          <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:18px;">
+            <div style="color:var(--amber-light); font-weight:700; font-size:14px; margin-bottom:6px;">Stage 2: Fine-Tuned MuRIL</div>
+            <div style="font-size:13px; color:var(--text-muted); line-height:1.5;">
+              Uses <code>google/muril-base-cased</code> fine-tuned on code-mixed Indian dialects to capture subtle emotional coercion and conversational arcs.
+            </div>
+          </div>
+
+          <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:18px;">
+            <div style="color:var(--amber-light); font-weight:700; font-size:14px; margin-bottom:6px;">Stage 3: 20-Signal Psychological Engine</div>
+            <div style="font-size:13px; color:var(--text-muted); line-height:1.5;">
+              Extracts high-risk behavioral patterns: authority impersonation, arrest threats, secrecy demands, urgency, and OTP traps.
+            </div>
+          </div>
+
+          <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:18px;">
+            <div style="color:var(--amber-light); font-weight:700; font-size:14px; margin-bottom:6px;">Stage 4: Consecutive Confirmation</div>
+            <div style="font-size:13px; color:var(--text-muted); line-height:1.5;">
+              Requires at least two consecutive high-risk turns to trigger severe alert banners, effectively eliminating transient false alarms.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: The 20 Semantic Behavioral Signals -->
+      <div class="doc-card">
+        <h2>3. Key Coercion Signals Detected</h2>
+        <p>
+          Scams adhere to recognizable social-engineering scripts. Sachet's engine tracks 20 distinct behavioral signals:
+        </p>
+
+        <table class="doc-table">
+          <thead>
+            <tr>
+              <th>Signal Category</th>
+              <th>Common Scammer Phrase / Tactic</th>
+              <th>Risk Level</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>authority_claim</code></td>
+              <td>"Main CBI Cyber Cell se Inspector Rathore bol raha hoon"</td>
+              <td>High</td>
+            </tr>
+            <tr>
+              <td><code>arrest_legal_threat</code></td>
+              <td>"Aapke naam par arrest warrant jaari hua hai, case confidential hai"</td>
+              <td>Critical</td>
+            </tr>
+            <tr>
+              <td><code>secrecy_isolation</code></td>
+              <td>"Kisi ko mat bataiye, room mein akele rahiye aur video call chalu rakhiye"</td>
+              <td>Critical</td>
+            </tr>
+            <tr>
+              <td><code>urgency_deadline</code></td>
+              <td>"Aaj raat 8 baje tak account block ho jayega, turant action lijiye"</td>
+              <td>High</td>
+            </tr>
+            <tr>
+              <td><code>asks_otp_pin_cvv</code></td>
+              <td>"Aapke number par 6-digit verification code aayega, batayein"</td>
+              <td>Severe</td>
+            </tr>
+            <tr>
+              <td><code>asks_money_transfer</code></td>
+              <td>"Verification ke liye saara paisa RBI security account mein transfer kijiye"</td>
+              <td>Severe</td>
+            </tr>
+            <tr>
+              <td><code>unsolicited_link_app</code></td>
+              <td>"Play Store se Quick Support Electricity bill update app download kijiye"</td>
+              <td>High</td>
+            </tr>
+            <tr>
+              <td><code>tells_to_verify_safely</code></td>
+              <td>"Bank kabhi OTP nahi maangta, official branch mein visit kijiye"</td>
+              <td><span style="color:var(--green-safe); font-weight:600;">Safe (Negative)</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Card 4: Strict Privacy Guarantee -->
+      <div class="doc-card" id="privacy">
+        <h2>4. Zero-Audio Privacy Architecture</h2>
+        <p>
+          Because phone calls are deeply sensitive personal interactions, Sachet is designed from day one with strict privacy boundaries:
+        </p>
+
+        <ul style="list-style:disc; padding-left:24px; color:#cbd5e1; font-size:14.5px; line-height:1.8;">
+          <li><strong>Text-Only Ingestion:</strong> The Sachet backend API never receives, logs, or stores raw audio.</li>
+          <li><strong>RAM-Only State:</strong> Active call turns and rolling risk scores are stored exclusively in temporary volatile memory (RAM). Nothing is written to a permanent disk or database.</li>
+          <li><strong>30-Minute Automatic TTL:</strong> All inactive sessions are permanently purged after 30 minutes.</li>
+          <li><strong>Immediate Hang-Up De-allocation:</strong> Calling <code>/v1/session/end</code> immediately deletes all session memory.</li>
+        </ul>
+      </div>
+
+      <!-- Action Footer -->
+      <div style="text-align:center; margin-top:40px;">
+        <a href="index.html#demo" class="btn btn-primary" style="margin-right:12px;">Try the Live Simulation</a>
+        <a href="api.html" class="btn btn-secondary">Explore API Specs</a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand-group">
+            <div class="brand-logo-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div class="brand-name">Sachet <span class="hindi">[सचेत]</span></div>
+          </div>
+          <p>Real-time scam-call risk detection service for Hindi and Hinglish conversations.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Navigation</h4>
+          <ul class="footer-links">
+            <li><a href="how-it-works.html">How it Works</a></li>
+            <li><a href="github.html">GitHub Repository</a></li>
+            <li><a href="api.html">REST API Reference</a></li>
+            <li><a href="index.html#demo">Interactive Demo</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Civic Helpline</h4>
+          <ul class="footer-links">
+            <li><a href="tel:1930" style="color:#fde68a; font-weight:600;">📞 National Helpline: 1930</a></li>
+            <li><a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">cybercrime.gov.in</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>© 2026-2027 Sachet Project</div>
+        <div>Open source civic safety technology</div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

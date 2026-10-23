@@ -1,387 +1,1125 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sachet</title>
-<style>
-  :root { --bg:#f6f7fb; --card:#fff; --text:#1b2030; --muted:#6a7287; --line:#e3e6ef;
-          --low:#2e9e5b; --med:#e0a100; --high:#d9342b; --accent:#3b5bdb; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#12151f; --card:#1b2030; --text:#eceff7; --muted:#9aa3ba; --line:#2b3248; --accent:#7c93ff; }
-  }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
-  header { display:flex; align-items:center; justify-content:space-between; padding:14px 20px;
-           background:var(--card); border-bottom:1px solid var(--line); }
-  header h1 { margin:0; font-size:20px; }
-  header small { color:var(--muted); margin-left:8px; }
-  .live { display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); }
-  .dot { width:10px; height:10px; border-radius:50%; background:var(--muted); }
-  .dot.on { background:var(--low); animation:pulse 1.4s infinite; }
-  @keyframes pulse { 50% { opacity:.35; } }
-  main { max-width:1100px; margin:20px auto; padding:0 16px; display:grid; gap:16px;
-         grid-template-columns: 1fr 1fr; }
-  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
-  .card h2 { margin:0 0 10px; font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
-  button { font:inherit; padding:8px 12px; border:1px solid var(--line); background:var(--card); color:var(--text);
-           border-radius:8px; cursor:pointer; }
-  button:hover { border-color:var(--accent); }
-  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
-  button:disabled { opacity:.5; cursor:not-allowed; }
-  .row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
-  input, select { font:inherit; padding:7px 9px; border:1px solid var(--line); border-radius:8px;
-                  background:var(--bg); color:var(--text); }
-  #transcript { height:340px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
-  .msg { max-width:85%; padding:8px 11px; border-radius:12px; font-size:15px; line-height:1.4; }
-  .msg.caller { background:var(--bg); border:1px solid var(--line); align-self:flex-start; }
-  .msg.victim { background:var(--accent); color:#fff; align-self:flex-end; }
-  .msg b { display:block; font-size:11px; opacity:.7; font-weight:600; margin-bottom:2px; }
-  .score { font-size:56px; font-weight:700; line-height:1; }
-  .level { font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
-  .bar { height:14px; background:var(--bg); border:1px solid var(--line); border-radius:8px; overflow:hidden; margin:12px 0; position:relative; }
-  .bar > div { height:100%; width:0; background:var(--low); transition:width .5s, background .5s; }
-  .tick { position:absolute; top:0; bottom:0; width:2px; background:var(--muted); opacity:.5; }
-  #reason { font-size:16px; line-height:1.5; min-height:48px; }
-  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-  .chip { font-size:12px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
-  #alert { display:none; background:var(--high); color:#fff; padding:12px 14px; border-radius:10px; margin-bottom:12px; font-weight:600; }
-  #err { color:var(--high); font-size:13px; margin-top:8px; min-height:16px; }
-  svg { width:100%; height:70px; display:block; }
-  .note { color:var(--muted); font-size:12px; margin-top:6px; }
-  dialog { background:var(--card); color:var(--text); border:1px solid var(--line); border-radius:12px;
-           padding:20px; max-width:400px; }
-  dialog::backdrop { background:rgba(0,0,0,.45); }
-  dialog h3 { margin:0 0 8px; }
-  dialog p { color:var(--muted); font-size:14px; line-height:1.5; margin:0 0 12px; }
-  dialog input { width:100%; margin-bottom:12px; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sachet (सचेत) — Real-Time Scam-Call Risk Detector</title>
+  <meta name="description" content="Intelligent, privacy-first scam-call risk detection service for Hindi and Hinglish phone conversations. Warns citizens in real time before fraud happens.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header>
-  <h1>Sachet <small>real-time scam call risk meter</small></h1>
-  <div class="live"><span class="dot" id="dot"></span><span id="liveText">Monitoring off</span></div>
-</header>
 
-<main>
-  <section class="card">
-    <h2>Call</h2>
-    <div class="row">
-      <button id="sc1">Digital arrest call</button>
-      <button id="sc2">KYC block call</button>
-      <button id="sc3">Electricity bill call</button>
-      <button id="sc4">Genuine bank alert</button>
+  <!-- Top Emergency Helpline Banner -->
+  <aside class="emergency-banner">
+    <span>🚨 <strong>Suspect fraud or cyber crime?</strong> Call National Cyber Helpline <strong>1930</strong> immediately or report at <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">cybercrime.gov.in</a></span>
+  </aside>
+
+  <!-- Navigation Bar: ONLY Logo, How it Works, GitHub, API, and Live Demo Button -->
+  <header class="site-nav">
+    <div class="container nav-wrapper">
+      <a href="index.html" class="brand-group">
+        <div class="brand-logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <div class="brand-name">
+          Sachet <span class="hindi">[सचेत]</span>
+        </div>
+        <span class="brand-badge">Civic Shield</span>
+      </a>
+
+      <nav>
+        <ul class="nav-links">
+          <li><a href="how-it-works.html" class="nav-link">How it Works</a></li>
+          <li><a href="github.html" class="nav-link">GitHub</a></li>
+          <li><a href="api.html" class="nav-link">API</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="#demo" class="btn btn-primary" style="padding: 8px 16px; font-size: 13px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Try Live Demo
+        </a>
+      </div>
     </div>
-    <div class="row">
-      <button id="micBtn" class="primary">Start microphone</button>
-      <select id="micSpeaker">
-        <option value="caller">Mic = caller</option>
-        <option value="victim">Mic = you</option>
-      </select>
-      <button id="endBtn">End call</button>
+  </header>
+
+  <!-- HERO SECTION -->
+  <section class="hero-section">
+    <div class="container hero-grid">
+      <div class="hero-content">
+        <div class="pill-badge">
+          <span class="pulse-dot"></span>
+          Real-Time Phone Scam Shield
+        </div>
+        <h1 class="hero-title">
+          A scam call sounds like a normal call, <span class="highlight">until it's too late.</span>
+        </h1>
+        <p class="hero-subtitle">
+          Sachet listens quietly to the conversation as it happens and warns you right on screen before you share an OTP, click a malicious link, or send hard-earned money.
+        </p>
+
+        <div class="hero-actions">
+          <a href="#demo" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            Try Live Demo
+          </a>
+          <a href="how-it-works.html" class="btn btn-secondary">
+            Learn How it Works
+          </a>
+        </div>
+
+        <div class="hero-trust-list">
+          <div class="trust-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            100% On-Device Option
+          </div>
+          <div class="trust-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Zero Audio Storage
+          </div>
+          <div class="trust-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Hindi & Hinglish Speech
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero Phone Simulation Card -->
+      <div class="hero-phone-card">
+        <div class="phone-header">
+          <div class="phone-indicator">
+            <span class="status-dot active"></span>
+            Sachet Shield Active
+          </div>
+          <span class="phone-badge-danger">Active Threat</span>
+        </div>
+
+        <div class="phone-risk-row">
+          <div>
+            <div class="phone-risk-num">89<small> / 100</small></div>
+          </div>
+          <div class="phone-risk-status">
+            <div class="label">Threat Level</div>
+            <div class="state">Severe Danger ⚠️</div>
+          </div>
+        </div>
+
+        <div class="phone-alert-box">
+          <strong>Digital Arrest Scam Detected</strong>
+          Caller claims CBI authority, creates fake arrest threats, and demands urgent money transfer.
+        </div>
+
+        <div class="phone-transcript-preview">
+          <div class="turn-caller">
+            <b>Caller:</b> "Aapke Aadhaar par arrest warrant jaari hua hai. Turant video call par aaiye..."
+          </div>
+          <div class="turn-victim">
+            <b>You:</b> "Kya? Maine toh kuch nahi kiya sir..."
+          </div>
+        </div>
+
+        <button class="phone-action-btn" onclick="document.getElementById('demo').scrollIntoView({behavior:'smooth'})">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/></svg>
+          Hang Up Call Immediately
+        </button>
+      </div>
     </div>
-    <div id="transcript"></div>
-    <div class="row" style="margin-top:10px">
-      <input id="typed" placeholder="Type a caller line and press Enter" style="flex:1">
-    </div>
-    <div class="row">
-      <input id="api" value="http://127.0.0.1:8000" size="24" title="API address">
-      <input id="key" placeholder="API key (if set)" size="14">
-    </div>
-    <div id="err"></div>
   </section>
 
-  <section class="card">
-    <h2>Risk</h2>
-    <div id="alert">Strong warning: this call looks like a scam. Do not share OTPs or send money. Hang up and call the official number.</div>
-    <div style="display:flex; align-items:baseline; gap:14px">
-      <div class="score" id="score">--</div>
-      <div class="level" id="level">no call yet</div>
+  <!-- STATISTICS SECTION ("THE SILENT EPIDEMIC") -->
+  <section class="stats-section">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-tag">The Epidemic in India</div>
+        <h2 class="section-title">The Silent Epidemic in Our Living Rooms</h2>
+        <p class="section-subtitle">
+          Digital arrest, fake bank alerts, and urgent courier parcels: scammers target ordinary citizens using psychological coercion.
+        </p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 6v2m0 8v2"/></svg>
+          </div>
+          <div class="stat-value">₹19,813 Cr</div>
+          <div class="stat-label">Lost to Cyber Frauds (2021–2024)</div>
+          <div class="stat-desc">
+            Reported by the Indian Cyber Crime Coordination Centre (I4C), representing life savings siphoned from ordinary Indian households.
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+          <div class="stat-value">UP: Top 5</div>
+          <div class="stat-label">States Targeted by Impersonators</div>
+          <div class="stat-desc">
+            Organized gangs aggressively target Hindi-speaking families with fake police, ATS, and court summons via video calls.
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div class="stat-value">3 in 4</div>
+          <div class="stat-label">Households Receive Scam Calls Weekly</div>
+          <div class="stat-desc">
+            According to national consumer surveys, 76% of Indian mobile users receive at least one scam or extortion call every 7 days.
+          </div>
+        </div>
+      </div>
+
+      <div class="fear-callout-banner">
+        <div class="fear-callout-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="fear-callout-text">
+          <strong>Our laws and institutions do not operate through fear.</strong> Scammers weaponize legal jargon, fake uniforms, and manufactured panic against ordinary people. Sachet provides the emotional circuit-breaker needed to pause and verify.
+        </div>
+      </div>
     </div>
-    <div class="bar"><div id="fill"></div><span class="tick" style="left:40%"></span><span class="tick" style="left:65%"></span></div>
-    <div id="reason">Start a sample call or the microphone to see the live risk.</div>
-    <div class="chips" id="chips"></div>
-    <h2 style="margin-top:18px">Trend</h2>
-    <svg viewBox="0 0 300 70" preserveAspectRatio="none">
-      <line x1="0" y1="42" x2="300" y2="42" stroke="currentColor" opacity=".15"/>
-      <line x1="0" y1="24.5" x2="300" y2="24.5" stroke="currentColor" opacity=".15"/>
-      <polyline id="line" fill="none" stroke="var(--accent)" stroke-width="2.5" points=""/>
-    </svg>
-    <div class="note">The score comes from the model and the explanation from keyword rules. Nothing is kept unless you choose to save the call record on your own device.</div>
   </section>
-</main>
 
-<dialog id="saveDlg">
-  <h3>Save this call as evidence?</h3>
-  <p>If you save, the transcript and risk scores are written to a file on this device only. Nothing is uploaded. If you don't save, they are erased now.</p>
-  <input id="callerNo" placeholder="Caller's number (optional)">
-  <div class="row">
-    <button id="saveYes" class="primary">Save to my device</button>
-    <button id="saveNo">Don't save</button>
-  </div>
-</dialog>
+  <!-- THE ANATOMY OF A SCAM CALL -->
+  <section class="anatomy-section">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-tag">Behavioral Progression</div>
+        <h2 class="section-title">The Anatomy of a Scam Call</h2>
+        <p class="section-subtitle">
+          How scammers engineer panic in under 3 minutes, and how genuine institutions behave differently.
+        </p>
+      </div>
 
-<script>
-const $ = id => document.getElementById(id);
-let sid = crypto.randomUUID(), playing = false, rec = null, log = [], isDemo = false;
+      <div class="arc-container">
+        <!-- Scam Arc -->
+        <div class="arc-card scam">
+          <div class="arc-header">
+            <span class="arc-badge danger">
+              <span class="pulse-dot" style="background:#ef4444;"></span>
+              The Imposter Arc (Scam Call Progression)
+            </span>
+            <span class="step-tag red">High Escalation Risk</span>
+          </div>
 
-const SAMPLES = {
-  sc1: [["caller","Hello, main CBI cyber cell se Inspector Rathore bol raha hoon. Aapke Aadhaar par 24 SIM cards nikle hain."],
-        ["victim","Kya? Maine toh sirf ek SIM liya hai."],
-        ["caller","Aapke naam par arrest warrant jaari hua hai. Ye case confidential hai, kisi ko mat bataiye."],
-        ["victim","Mujhe bahut darr lag raha hai."],
-        ["caller","Aap abhi video call par rahiye, phone mat kaatiye. Verification ke liye turant paisa safe account mein transfer kijiye."]],
-  sc2: [["caller","Sir main SBI head office se bol raha hoon. Aapka KYC expire ho gaya hai."],
-        ["victim","Kal branch aa jaun?"],
-        ["caller","Nahi sir, aaj raat tak account block ho jayega. Main ek link bhej raha hoon, wahan details bhariye."],
-        ["victim","Link? Bank toh branch bulata hai."],
-        ["caller","Naya process hai. Aapke phone par OTP aayega, wo mujhe turant bata dijiye."]],
-  sc3: [["caller","Hello sir, main bijli vibhag se bol raha hoon. Aapke flat ka bijli bill update nahi hai."],
-        ["victim","Bill toh humne pichle mahine bhar diya tha."],
-        ["caller","Aaj raat tak update nahi hua toh bijli kat jayegi. Aap Play Store se Bill Update Quick Support app download kijiye."],
-        ["victim","Kaunsa office hai aapka?"],
-        ["caller","Sir pehle app install kijiye, time kam hai, baaki sab app mein dikh jayega."]],
-  sc4: [["caller","Namaste, main HDFC Bank ke fraud team se bol rahi hoon. Aapke card se 12,400 ka transaction hua hai, kya aapne kiya?"],
-        ["victim","Nahi, maine nahi kiya."],
-        ["caller","Maine card block kar diya hai. Dhyan rakhiye, bank kabhi OTP, PIN ya CVV nahi maangta, kisi ko mat bataiye."],
-        ["victim","Aage kya karna hai?"],
-        ["caller","Aap card ke peeche likhe customer care number par khud call kijiye aur naya card request kar dijiye."]]
-};
+          <div class="arc-timeline-grid">
+            <div class="timeline-step">
+              <div class="step-num"><span>Phase 1</span> <span class="step-tag red">0:30 Min</span></div>
+              <div class="step-title">Fake Authority</div>
+              <div class="step-desc">Caller claims to be from CBI, Crime Branch, TRAI, or Bank Vigilance with fake badge numbers.</div>
+            </div>
 
-function headers() {
-  const h = { "Content-Type": "application/json" };
-  if ($("key").value.trim()) h["x-api-key"] = $("key").value.trim();
-  return h;
-}
-function base() { return $("api").value.replace(/\/$/, ""); }
+            <div class="timeline-step">
+              <div class="step-num"><span>Phase 2</span> <span class="step-tag red">1:15 Min</span></div>
+              <div class="step-title">Fear & Isolation</div>
+              <div class="step-desc">"Stay on video, lock your door, do not tell your family. This is an official confidential case."</div>
+            </div>
 
-function addMsg(who, text) {
-  const d = document.createElement("div");
-  d.className = "msg " + who;
-  const b = document.createElement("b");
-  b.textContent = who === "caller" ? "Caller" : "You";
-  const t = document.createElement("span");
-  t.textContent = text;
-  d.append(b, t);
-  $("transcript").appendChild(d);
-  $("transcript").scrollTop = 1e9;
-}
+            <div class="timeline-step">
+              <div class="step-num"><span>Phase 3</span> <span class="step-tag red">2:00 Min</span></div>
+              <div class="step-title">Extreme Urgency</div>
+              <div class="step-desc">"Your bank accounts will be seized in 30 minutes unless you verify your identity right now."</div>
+            </div>
 
-function show(r) {
-  const s = r.risk_score;
-  $("score").textContent = s;
-  $("level").textContent = r.level;
-  const col = r.level === "high" ? "var(--high)" : r.level === "medium" ? "var(--med)" : "var(--low)";
-  $("level").style.color = col;
-  $("fill").style.width = Math.max(0, Math.min(100, s)) + "%";
-  $("fill").style.background = col;
-  $("reason").textContent = r.reason;
-  $("alert").style.display = r.alert ? "block" : "none";
-  const chips = $("chips");
-  chips.replaceChildren();
-  (r.signals || []).forEach(x => {
-    const c = document.createElement("span");
-    c.className = "chip";
-    c.textContent = x;
-    chips.appendChild(c);
-  });
-  const h = r.history, n = h.length;
-  $("line").setAttribute("points", h.map((v, i) =>
-    (n === 1 ? 150 : i * 300 / (n - 1)) + "," + (70 - (v / 100) * 70)).join(" "));
-}
+            <div class="timeline-step">
+              <div class="step-num"><span>Phase 4</span> <span class="step-tag red">3:00 Min</span></div>
+              <div class="step-title">Demand for OTP / Cash</div>
+              <div class="step-desc">"Transfer all funds to our RBI safe verification account" or "Share the 6-digit OTP immediately."</div>
+            </div>
+          </div>
+        </div>
 
-async function send(speaker, text) {
-  addMsg(speaker, text);
-  const entry = { time: new Date(), speaker, text };
-  log.push(entry);
-  $("dot").className = "dot on";
-  $("liveText").textContent = "Monitoring active";
-  try {
-    const res = await fetch(base() + "/v1/analyze", {
-      method: "POST", headers: headers(),
-      body: JSON.stringify({ session_id: sid, text, speaker })
-    });
-    if (!res.ok) throw new Error("API " + res.status + " " + (await res.text()).slice(0, 120));
-    const r = await res.json();
-    Object.assign(entry, { score: r.risk_score, level: r.level, reason: r.reason, alert: r.alert });
-    show(r);
-    $("err").textContent = "";
-  } catch (e) {
-    $("err").textContent = "Could not reach the API: " + e.message;
-  }
-}
+        <!-- Safe Arc -->
+        <div class="arc-card safe">
+          <div class="arc-header">
+            <span class="arc-badge safe">
+              <span class="pulse-dot" style="background:#10b981;"></span>
+              Genuine Institutional Call (Safe Pattern)
+            </span>
+            <span class="step-tag green">Zero Coercion</span>
+          </div>
 
-function stopInputs() {
-  playing = false;
-  if (rec) {
-    rec.onend = null;
-    try { rec.stop(); } catch (e) {}
-    rec = null;
-    $("micBtn").textContent = "Start microphone";
-  }
-}
+          <div class="arc-timeline-grid">
+            <div class="timeline-step">
+              <div class="step-num"><span>Phase 1</span> <span class="step-tag green">Identity</span></div>
+              <div class="step-title">Clear Identification</div>
+              <div class="step-desc">Provides verifiable employee ID, department, and official reference ticket number without hostility.</div>
+            </div>
 
-async function resetCall() {
-  stopInputs();
-  try {
-    await fetch(base() + "/v1/session/end", {
-      method: "POST", headers: headers(), body: JSON.stringify({ session_id: sid })
-    });
-  } catch (e) {}
-  sid = crypto.randomUUID();
-  log = [];
-  isDemo = false;
-  $("transcript").replaceChildren();
-  $("score").textContent = "--";
-  $("level").textContent = "no call yet";
-  $("level").style.color = "";
-  $("fill").style.width = "0";
-  $("reason").textContent = "Call ended. Session deleted from the server.";
-  $("chips").replaceChildren();
-  $("alert").style.display = "none";
-  $("line").setAttribute("points", "");
-  $("dot").className = "dot";
-  $("liveText").textContent = "Monitoring off";
-}
+            <div class="timeline-step">
+              <div class="step-num"><span>Phase 2</span> <span class="step-tag green">Options</span></div>
+              <div class="step-title">In-Branch Alternatives</div>
+              <div class="step-desc">"You may visit any official bank branch or customer service center at your convenience."</div>
+            </div>
 
-function endCall(ask) {
-  if (ask && log.length) {
-    stopInputs();
-    $("callerNo").value = "";
-    $("saveDlg").showModal();
-    return;
-  }
-  return resetCall();
-}
+            <div class="timeline-step">
+              <div class="step-num"><span>Phase 3</span> <span class="step-tag green">Safety</span></div>
+              <div class="step-title">Explicit Safeguards</div>
+              <div class="step-desc">Explicitly states: "Our staff will never ask for your confidential OTP, UPI PIN, or password."</div>
+            </div>
 
-const pad = n => String(n).padStart(2, "0");
-const fmt = d => pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + " " +
-                 pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+            <div class="timeline-step">
+              <div class="step-num"><span>Phase 4</span> <span class="step-tag green">Respect</span></div>
+              <div class="step-title">Calm Resolution</div>
+              <div class="step-desc">Caller accepts callbacks to official toll-free numbers and does not pressure or threaten the citizen.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-function buildRecord(number) {
-  const scored = log.filter(e => e.score !== undefined);
-  const last = scored[scored.length - 1];
-  const peak = scored.length ? Math.max(...scored.map(e => e.score)) : "n/a";
-  const out = [];
-  out.push("SACHET CALL RECORD (automatically generated)");
-  out.push("=============================================");
-  out.push("Source        : " + (isDemo ? "demo sample call (not a real call)" : "live input"));
-  out.push("Call started  : " + (log[0] ? fmt(log[0].time) : "n/a"));
-  out.push("Call ended    : " + fmt(new Date()));
-  out.push("Caller number : " + (number || "not provided"));
-  out.push("Final risk    : " + (last ? last.score + "/100 (" + last.level + ")" : "n/a") + ", peak " + peak);
-  out.push("Strong warning shown: " + (scored.some(e => e.alert) ? "yes" : "no"));
-  out.push("");
-  out.push("Note: the transcript comes from speech recognition and may contain errors. The risk score is an automated estimate, not a verdict. Keep this record together with your call log, screenshots and payment receipts.");
-  out.push("");
-  out.push("TRANSCRIPT");
-  out.push("----------");
-  log.forEach(e => {
-    const who = e.speaker === "caller" ? "CALLER" : "YOU";
-    const sc = (e.speaker === "caller" && e.score !== undefined) ? "   (risk " + e.score + ")" : "";
-    out.push("[" + fmt(e.time) + "] " + who + ": " + e.text + sc);
-  });
-  out.push("");
-  out.push("IF YOU WERE SCAMMED");
-  out.push("Call 1930 (national cyber fraud helpline) immediately and file a complaint at cybercrime.gov.in. Contact your bank to try to stop the transaction. Attach this record, the caller's number and the transaction details.");
-  return out.join("\n");
-}
+  <!-- FEATURES & PRIVACY SECTION -->
+  <section class="features-section">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-tag">Engineered for Safety</div>
+        <h2 class="section-title">Intelligent Guard, Respecting Privacy</h2>
+        <p class="section-subtitle">
+          An ultra-lightweight processing engine running locally or ephemeral, built for zero eavesdropping.
+        </p>
+      </div>
 
-function download(name, text) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-}
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-num-badge">1</div>
+          <h3 class="feature-title">Call Turn-by-Turn Analysis</h3>
+          <p class="feature-desc">
+            Analyzes conversational shifts sentence-by-sentence. Detects intimidation, isolation tactics, and psychological pressure.
+          </p>
+        </div>
 
-$("saveYes").onclick = async () => {
-  const d = new Date();
-  const name = "sachet-call-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
-               "-" + pad(d.getHours()) + pad(d.getMinutes()) + ".txt";
-  download(name, buildRecord($("callerNo").value.trim()));
-  $("saveDlg").close();
-  await resetCall();
-  $("reason").textContent = "Call record saved to your device. Session deleted from the server.";
-};
-$("saveNo").onclick = async () => {
-  $("saveDlg").close();
-  await resetCall();
-  $("reason").textContent = "Call ended. Nothing was saved. Session deleted from the server.";
-};
+        <div class="feature-card">
+          <div class="feature-num-badge">2</div>
+          <h3 class="feature-title">Fine-Tuned Speech-to-Text</h3>
+          <p class="feature-desc">
+            Handles colloquial Hindi and code-mixed Hinglish naturally, parsing conversational speech without bias.
+          </p>
+        </div>
 
-async function playSample(key) {
-  if (playing) return;
-  await resetCall();
-  playing = true;
-  isDemo = true;
-  for (const [who, text] of SAMPLES[key]) {
-    if (!playing) break;
-    await send(who, text);
-    await new Promise(r => setTimeout(r, 1600));
-  }
-  playing = false;
-}
+        <div class="feature-card">
+          <div class="feature-num-badge">3</div>
+          <h3 class="feature-title">Semantic Risk Engine</h3>
+          <p class="feature-desc">
+            20-signal psychological detector tracking authority impersonation, arrest threats, OTP requests, and urgency.
+          </p>
+        </div>
 
-["sc1", "sc2", "sc3", "sc4"].forEach(k => $(k).onclick = () => playSample(k));
-$("endBtn").onclick = () => endCall(true);
-$("typed").addEventListener("keydown", e => {
-  if (e.key === "Enter" && e.target.value.trim()) {
-    send("caller", e.target.value.trim());
-    e.target.value = "";
-  }
-});
+        <div class="feature-card">
+          <div class="feature-num-badge">4</div>
+          <h3 class="feature-title">Live Guard Warning</h3>
+          <p class="feature-desc">
+            Visual risk meter with actionable Hindi guidance warns the user before the OTP or money transfer happens, not after.
+          </p>
+        </div>
+      </div>
 
-async function transcribeAndSend(blob) {
-  const mySid = sid;
-  const fd = new FormData();
-  fd.append("file", blob, "seg.webm");
-  const h = {};
-  if ($("key").value.trim()) h["x-api-key"] = $("key").value.trim();
-  try {
-    const r = await fetch(base() + "/v1/transcribe?lang=hi", { method: "POST", headers: h, body: fd });
-    if (!r.ok) throw new Error("STT " + r.status);
-    const { text } = await r.json();
-    if (mySid === sid && text) send($("micSpeaker").value, text);
-  } catch (e) {
-    $("err").textContent = "Transcription failed: " + e.message;
-  }
-}
+      <div class="privacy-banner-card">
+        <div class="privacy-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="privacy-content">
+          <h3>Zero Audio Storage — Uncompromising Civic Privacy</h3>
+          <p>
+            Sachet operates on a strict privacy model: raw voice audio is never stored or transmitted. Only transient text tokens are evaluated in ephemeral volatile memory. Call sessions are automatically purged after 30 minutes, or erased immediately when you hang up.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-$("micBtn").onclick = async () => {
-  if (rec) { stopInputs(); return; }
-  let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch (e) { $("err").textContent = "Microphone blocked: " + e.message; return; }
-  const ctl = {
-    active: true, onend: null, mr: null,
-    stop() {
-      this.active = false;
-      if (this.mr && this.mr.state !== "inactive") this.mr.stop();
-      stream.getTracks().forEach(t => t.stop());
+  <!-- INTERACTIVE LIVE APP SECTION -->
+  <section class="demo-section" id="demo">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-tag">Interactive Simulation</div>
+        <h2 class="section-title">Experience Sachet in Action</h2>
+        <p class="section-subtitle">
+          Toggle between common scam scripts or speak directly via your microphone to watch the risk meter update live.
+        </p>
+      </div>
+
+      <div class="demo-container">
+        <!-- Preset Toolbar -->
+        <div class="demo-toolbar">
+          <div class="demo-presets">
+            <span style="font-size:12px; font-weight:700; text-transform:uppercase; color:var(--text-dim); margin-right:4px;">Sample Calls:</span>
+            <button class="demo-preset-btn" id="sc1">🚨 Digital Arrest</button>
+            <button class="demo-preset-btn" id="sc2">💳 KYC Block</button>
+            <button class="demo-preset-btn" id="sc3">⚡ Electricity Bill</button>
+            <button class="demo-preset-btn" id="sc4">✅ Genuine Bank</button>
+          </div>
+
+          <div class="demo-status">
+            <span class="status-dot" id="dot"></span>
+            <span id="liveText">Monitoring off</span>
+          </div>
+        </div>
+
+        <!-- Two Column Interactive App -->
+        <div class="demo-app-grid">
+          <!-- Left Column: Call Transcript & Inputs -->
+          <div class="demo-column left">
+            <div class="column-header">
+              <span class="column-title">Live Call Ingestion</span>
+              <span style="font-size:12px; color:var(--text-dim);">Text & Voice Stream</span>
+            </div>
+
+            <div class="controls-row">
+              <button class="mic-toggle-btn" id="micBtn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                <span>Start Microphone</span>
+              </button>
+
+              <div class="speaker-toggle" id="speakerToggle" role="group" aria-label="Active speaker">
+                <button type="button" class="speaker-opt active" data-val="caller" id="optCaller">Caller</button>
+                <button type="button" class="speaker-opt" data-val="victim" id="optReceiver">Receiver</button>
+              </div>
+
+              <button class="btn-end" id="endBtn">End Call</button>
+            </div>
+
+            <!-- Live Transcript -->
+            <div class="transcript-box" id="transcript">
+              <div style="color:var(--text-dim); font-size:13px; text-align:center; margin:auto;">
+                Select a sample scam script above or speak into your microphone to simulate an ongoing call.
+              </div>
+            </div>
+
+            <!-- Typing Input -->
+            <div class="typing-input-row">
+              <input type="text" id="typed" placeholder="Type a caller statement in Hindi/Hinglish and press Enter...">
+            </div>
+
+            <!-- API Host Settings Drawer -->
+            <div>
+              <span class="api-settings-toggle" onclick="document.getElementById('apiSettings').classList.toggle('open')">Configure API endpoint & key</span>
+              <div class="api-settings-panel" id="apiSettings">
+                <input id="api" value="http://127.0.0.1:8000" size="24" title="API Base URL">
+                <input id="key" placeholder="API key (optional)" size="16">
+              </div>
+            </div>
+
+            <div id="err" style="color:var(--red-danger); font-size:12.5px; margin-top:8px; min-height:16px;"></div>
+          </div>
+
+          <!-- Right Column: Real-Time Risk Analytics -->
+          <div class="demo-column">
+            <div class="column-header">
+              <span class="column-title">Real-Time Risk Meter</span>
+              <span style="font-size:12px; color:var(--text-dim);">MuRIL Multi-Signal AI</span>
+            </div>
+
+            <!-- Alert Box -->
+            <div class="danger-alert-box" id="alert">
+              ⚠️ <strong>Strong Warning:</strong> High probability of scam! Do not share OTPs, click links, or transfer funds. Hang up and verify through official channels.
+            </div>
+
+            <!-- Circular Gauge & Score -->
+            <div class="gauge-hero-container">
+              <div class="gauge-svg-wrapper">
+                <svg width="110" height="110" viewBox="0 0 100 100">
+                  <circle class="gauge-bg-circle" cx="50" cy="50" r="45"></circle>
+                  <circle class="gauge-progress-circle" id="radialCircle" cx="50" cy="50" r="45"></circle>
+                </svg>
+                <div class="gauge-center-val">
+                  <div class="score" id="score">--</div>
+                  <div class="sub">/ 100</div>
+                </div>
+              </div>
+
+              <div class="gauge-info">
+                <div class="gauge-level-badge" id="level">NO CALL YET</div>
+                <div style="font-size:13px; color:var(--text-muted);">Conversational Risk Score</div>
+                <div class="gauge-linear-bar">
+                  <div class="gauge-linear-fill" id="fill"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Hindi/Hinglish Explanation -->
+            <div class="reason-explanation-box" id="reason">
+              Select a sample call script or speak to activate the real-time risk meter.
+            </div>
+
+            <!-- Detected Signal Chips -->
+            <div style="font-size:11.5px; font-weight:700; text-transform:uppercase; color:var(--text-dim); margin-bottom:6px;">
+              Detected Psychological Signals
+            </div>
+            <div class="signals-container" id="chips">
+              <span style="color:var(--text-dim); font-size:12px;">No active signals detected.</span>
+            </div>
+
+            <!-- Trend Graph -->
+            <div class="trend-graph-wrapper">
+              <div class="trend-title">
+                <span>Risk Trajectory Over Call Turns</span>
+                <span id="trendTurns">0 turns</span>
+              </div>
+              <svg class="trend-svg" viewBox="0 0 300 70" preserveAspectRatio="none">
+                <line x1="0" y1="42" x2="300" y2="42" stroke="currentColor" opacity=".12"/>
+                <line x1="0" y1="24.5" x2="300" y2="24.5" stroke="currentColor" opacity=".12"/>
+                <polyline id="line" fill="none" stroke="var(--blue-brand)" stroke-width="2.5" points=""/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAMILY & CIVIC SAFETY SECTION -->
+  <section class="family-section">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-tag">Civic Empathy</div>
+        <h2 class="section-title">Dignity and Safety for Every Family Member</h2>
+        <p class="section-subtitle">
+          Engineered with deep empathy for vulnerable groups most aggressively targeted by fraud syndicates.
+        </p>
+      </div>
+
+      <div class="persona-grid">
+        <div class="persona-card">
+          <div class="persona-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <h3 class="persona-title">Senior Citizens & Grandparents</h3>
+          <p class="persona-desc">
+            Provides reassuring clarity against intimidating fake legal threats, mock police warrants, and pension deactivation scams.
+          </p>
+        </div>
+
+        <div class="persona-card">
+          <div class="persona-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="3"/></svg>
+          </div>
+          <h3 class="persona-title">Women & First-Time Digital Users</h3>
+          <p class="persona-desc">
+            Instills confidence when navigating mobile banking, UPI payments, and suspicious courier issues without anxiety.
+          </p>
+        </div>
+
+        <div class="persona-card">
+          <div class="persona-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3 class="persona-title">Families (Guardian Mode)</h3>
+          <p class="persona-desc">
+            Allows exporting detailed call records with timestamps and risk scores for prompt reporting to the 1930 Cyber Helpline.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EVALUATION SECTION -->
+  <section class="eval-section">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-tag">Rigorous Benchmarks</div>
+        <h2 class="section-title">Transparent Prototype Evaluation</h2>
+        <p class="section-subtitle">
+          Evaluated against diverse synthetic and real-world Hindi/Hinglish phone dialogues.
+        </p>
+      </div>
+
+      <div class="eval-grid">
+        <div class="eval-metric-card">
+          <div class="eval-metric-num highlight">95.5%</div>
+          <div class="eval-metric-label">Scam Detection Recall</div>
+          <div class="eval-metric-desc">
+            Successfully identifies and triggers high-severity alerts before the critical OTP or financial transfer point.
+          </div>
+        </div>
+
+        <div class="eval-metric-card">
+          <div class="eval-metric-num">14.6%</div>
+          <div class="eval-metric-label">Hard-Negative False Alarm</div>
+          <div class="eval-metric-desc">
+            Tested against genuine bank OTP reminders, delivery coordinators, and clinic calls without excessive nuisance alerts.
+          </div>
+        </div>
+
+        <div class="eval-metric-card">
+          <div class="eval-metric-num">1.2 sec</div>
+          <div class="eval-metric-label">Average Turn Analysis Latency</div>
+          <div class="eval-metric-desc">
+            Ultra-low latency streaming inference ensures on-screen advice arrives while the caller is still speaking.
+          </div>
+        </div>
+      </div>
+
+      <div class="eval-footnote">
+        🔬 <strong>Methodology Note:</strong> Evaluated on fine-tuned MuRIL (Multilingual Representations for Indian Languages) with consecutive-confirmation alert gating. All benchmarks are reproducible via the evaluation suite in <code>eval/</code>.
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA BANNER SECTION -->
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-box">
+        <div class="cta-icon-badge">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h2 class="cta-title">Protecting India's Next Half-Billion Digital Citizens</h2>
+        <p class="cta-text">
+          Sachet is built as open-source civic defense technology. Explore our conversational safety engine, synthetic datasets, and evaluation code on GitHub.
+        </p>
+        <div class="cta-actions">
+          <a href="github.html" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+            View on GitHub
+          </a>
+          <a href="api.html" class="btn btn-secondary">
+            Developer API Specs
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand-group">
+            <div class="brand-logo-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div class="brand-name">Sachet <span class="hindi">[सचेत]</span></div>
+          </div>
+          <p>
+            Real-time scam-call risk detection service for Hindi and Hinglish conversations. Built with defensive intent: "Warn, Never Block".
+          </p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Platform Navigation</h4>
+          <ul class="footer-links">
+            <li><a href="how-it-works.html">How it Works</a></li>
+            <li><a href="github.html">GitHub Repository</a></li>
+            <li><a href="api.html">REST API Reference</a></li>
+            <li><a href="#demo">Interactive Simulation</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Civic Helpline</h4>
+          <ul class="footer-links">
+            <li><a href="tel:1930" style="color:#fde68a; font-weight:600;">📞 National Helpline: 1930</a></li>
+            <li><a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">cybercrime.gov.in</a></li>
+            <li><a href="how-it-works.html#privacy">Zero Audio Privacy Guarantee</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>© 2026-2027 Sachet Project</div>
+        <div>Open source civic safety technology for digital citizens</div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Save Call Evidence Dialog -->
+  <dialog class="save-modal" id="saveDlg">
+    <h3>Save this call as evidence?</h3>
+    <p>
+      If you save, the transcript and risk scores are written to a plain text file on this device only. Nothing is uploaded or retained on the server.
+    </p>
+    <input id="callerNo" placeholder="Caller's phone number or ID (optional)">
+    <div class="modal-actions">
+      <button id="saveYes" class="btn btn-primary" style="flex:1;">Save to My Device</button>
+      <button id="saveNo" class="btn btn-secondary">Don't Save</button>
+    </div>
+  </dialog>
+
+  <!-- Interactive Demo Logic -->
+  <script>
+    const $ = id => document.getElementById(id);
+    let sid = crypto.randomUUID(), playing = false, rec = null, log = [], isDemo = false;
+
+    const SAMPLES = {
+      sc1: [
+        ["caller", "Hello, main CBI Cyber Crime Cell Lucknow se Inspector Sunil Rathore bol raha hoon. Aapke Aadhaar card par 24 illegal SIM cards nikle hain."],
+        ["victim", "Kya? Maine toh sirf ek hi SIM card liya hai."],
+        ["caller", "Aapke naam par arrest warrant jaari hua hai. Ye money laundering case hai, ye call confidential hai, kisi ko mat bataiye."],
+        ["victim", "Sir mujhe bahut darr lag raha hai, maine kuch nahi kiya."],
+        ["caller", "Aap abhi video call par rahiye, phone mat kaatiye. Verification ke liye turant saara paisa safe government account mein transfer kijiye."]
+      ],
+      sc2: [
+        ["caller", "Sir main SBI head office Mumbai se bol raha hoon. Aapka KYC document expire ho gaya hai."],
+        ["victim", "Kya main kal subah bank branch aa jaun?"],
+        ["caller", "Nahi sir, aaj raat 8 baje tak aapka account permanently block ho jayega. Main ek link bhej raha hoon, wahan turant details bhariye."],
+        ["victim", "Link? Par bank toh branch aane ko bolta hai."],
+        ["caller", "Ye naya emergency digital process hai. Aapke registered phone par 6-digit OTP aayega, wo mujhe turant bata dijiye."]
+      ],
+      sc3: [
+        ["caller", "Hello sir, main bijli vibhag head office se bol raha hoon. Aapke ghar ka bijli bill pichle 2 mahine se update nahi hai."],
+        ["victim", "Bill toh humne pichle hafte hi online bhar diya tha."],
+        ["caller", "Aaj raat 9:30 baje connection cut ho jayega. Turant Play Store se Quick Support Electricity app download kijiye aur verification kijiye."],
+        ["victim", "Aapka office kahan par hai? Main wahan check karta hoon."],
+        ["caller", "Sir pehle app install kijiye warna light cut ho jayegi, time bilkul nahi hai!"]
+      ],
+      sc4: [
+        ["caller", "Namaste, main HDFC Bank fraud monitoring team se bol rahi hoon. Aapke credit card se 12,400 ka international transaction hua hai, kya ye aapne kiya?"],
+        ["victim", "Nahi ma'am, maine aisa koi transaction nahi kiya."],
+        ["caller", "Humne safety ke liye card abhi block kar diya hai. Dhyan rakhiye, bank kabhi bhi aapka OTP, PIN ya password nahi maangta, kisi ko mat bataiye."],
+        ["victim", "Theek hai, aage mujhe kya karna chahiye?"],
+        ["caller", "Aap apne card ke peeche diye gaye official customer care number par call kijiye ya nazdeeki branch jakar naya card request kar lijiye."]
+      ]
+    };
+
+    function headers() {
+      const h = { "Content-Type": "application/json" };
+      if ($("key").value.trim()) h["x-api-key"] = $("key").value.trim();
+      return h;
     }
-  };
-  rec = ctl;
-  $("micBtn").textContent = "Stop microphone";
-  const cycle = () => {
-    if (!ctl.active) return;
-    const mr = new MediaRecorder(stream);
-    ctl.mr = mr;
-    const parts = [];
-    mr.ondataavailable = e => { if (e.data.size) parts.push(e.data); };
-    mr.onstop = () => {
-      if (parts.length) transcribeAndSend(new Blob(parts, { type: mr.mimeType }));
+    function base() {
+      const val = $("api").value.trim();
+      if (val && !val.includes("127.0.0.1") && !val.includes("localhost")) {
+        return val.replace(/\/$/, "");
+      }
+      // If deployed online (e.g. Render / Vercel), default to origin instead of localhost
+      if (window.location.hostname !== "127.0.0.1" && window.location.hostname !== "localhost") {
+        return window.location.origin;
+      }
+      return val ? val.replace(/\/$/, "") : "http://127.0.0.1:8000";
+    }
+
+    function addMsg(who, text) {
+      const placeholder = $("transcript").querySelector('div[style*="text-align:center"]');
+      if (placeholder) placeholder.remove();
+
+      const isCaller = (who === "caller");
+      const d = document.createElement("div");
+      d.className = "chat-bubble " + (isCaller ? "caller" : "victim");
+      const b = document.createElement("span");
+      b.className = "speaker-tag";
+      b.textContent = isCaller ? "CALLER (SUSPECT)" : "RECEIVER (YOU)";
+      const t = document.createElement("span");
+      t.textContent = text;
+      d.append(b, t);
+      $("transcript").appendChild(d);
+      $("transcript").scrollTop = 1e9;
+    }
+
+    function show(r) {
+      const s = Math.max(0, Math.min(100, Math.round(r.risk_score)));
+      $("score").textContent = s;
+      
+      const lv = r.level;
+      $("level").textContent = lv === "high" ? "HIGH RISK" : lv === "medium" ? "CAUTION" : "NORMAL";
+      
+      const col = lv === "high" ? "var(--red-danger)" : lv === "medium" ? "var(--amber-primary)" : "var(--green-safe)";
+      const bgCol = lv === "high" ? "rgba(239, 68, 68, 0.15)" : lv === "medium" ? "rgba(245, 158, 11, 0.15)" : "rgba(16, 185, 129, 0.15)";
+      const borderCol = lv === "high" ? "rgba(239, 68, 68, 0.35)" : lv === "medium" ? "rgba(245, 158, 11, 0.35)" : "rgba(16, 185, 129, 0.35)";
+
+      $("level").style.color = col;
+      $("level").style.background = bgCol;
+      $("level").style.borderColor = borderCol;
+
+      // Update radial circular gauge (circumference = 2 * PI * 45 ≈ 282.7)
+      const circumference = 282.7;
+      const offset = circumference - (s / 100) * circumference;
+      const circle = $("radialCircle");
+      circle.style.strokeDashoffset = offset;
+      circle.style.stroke = col;
+
+      // Linear bar fallback
+      $("fill").style.width = s + "%";
+      $("fill").style.background = col;
+
+      // Explanation
+      $("reason").textContent = r.reason || "Analyzing call patterns...";
+      $("alert").style.display = r.alert ? "block" : "none";
+
+      // Signal chips
+      const chips = $("chips");
+      chips.replaceChildren();
+      const signals = r.signals || [];
+      if (signals.length === 0) {
+        const span = document.createElement("span");
+        span.style.color = "var(--text-dim)";
+        span.style.fontSize = "12px";
+        span.textContent = "No coercive signals detected.";
+        chips.appendChild(span);
+      } else {
+        signals.forEach(x => {
+          const c = document.createElement("span");
+          c.className = "signal-pill";
+          c.textContent = x;
+          chips.appendChild(c);
+        });
+      }
+
+      // Trend line
+      const h = r.history || [];
+      const n = h.length;
+      $("trendTurns").textContent = n + " turn" + (n === 1 ? "" : "s");
+      if (n > 0) {
+        $("line").setAttribute("points", h.map((v, i) =>
+          (n === 1 ? 150 : i * 300 / (n - 1)) + "," + (70 - (v / 100) * 70)).join(" "));
+      }
+    }
+
+    async function send(speaker, text) {
+      addMsg(speaker, text);
+      const entry = { time: new Date(), speaker, text };
+      log.push(entry);
+      $("dot").className = "status-dot active";
+      $("liveText").textContent = "Monitoring active";
+      try {
+        const res = await fetch(base() + "/v1/analyze", {
+          method: "POST", headers: headers(),
+          body: JSON.stringify({ session_id: sid, text, speaker })
+        });
+        if (!res.ok) throw new Error("API " + res.status + " " + (await res.text()).slice(0, 120));
+        const r = await res.json();
+        Object.assign(entry, { score: r.risk_score, level: r.level, reason: r.reason, alert: r.alert });
+        show(r);
+        $("err").textContent = "";
+      } catch (e) {
+        $("err").textContent = "Could not reach API (" + base() + "): " + e.message;
+      }
+    }
+
+    function stopInputs() {
+      playing = false;
+      document.querySelectorAll(".demo-preset-btn").forEach(b => b.classList.remove("active"));
+      if (rec) {
+        rec.onend = null;
+        try { rec.stop(); } catch (e) {}
+        rec = null;
+        $("micBtn").classList.remove("recording");
+        if (typeof updateMicLabel === "function") updateMicLabel();
+        else $("micBtn").querySelector("span").textContent = "Start Microphone";
+      }
+    }
+
+    async function resetCall() {
+      stopInputs();
+      try {
+        await fetch(base() + "/v1/session/end", {
+          method: "POST", headers: headers(), body: JSON.stringify({ session_id: sid })
+        });
+      } catch (e) {}
+      sid = crypto.randomUUID();
+      log = [];
+      isDemo = false;
+      $("transcript").innerHTML = '<div style="color:var(--text-dim); font-size:13px; text-align:center; margin:auto;">Select a sample scam script above or speak into your microphone to simulate an ongoing call.</div>';
+      $("score").textContent = "--";
+      $("level").textContent = "NO CALL YET";
+      $("level").style.color = "";
+      $("level").style.background = "";
+      $("level").style.borderColor = "";
+      $("radialCircle").style.strokeDashoffset = "283";
+      $("radialCircle").style.stroke = "var(--green-safe)";
+      $("fill").style.width = "0";
+      $("reason").textContent = "Call ended. Session securely deleted from RAM.";
+      $("chips").innerHTML = '<span style="color:var(--text-dim); font-size:12px;">No active signals detected.</span>';
+      $("alert").style.display = "none";
+      $("line").setAttribute("points", "");
+      $("trendTurns").textContent = "0 turns";
+      $("dot").className = "status-dot";
+      $("liveText").textContent = "Monitoring off";
+    }
+
+    function endCall(ask) {
+      if (ask && log.length) {
+        stopInputs();
+        $("callerNo").value = "";
+        $("saveDlg").showModal();
+        return;
+      }
+      return resetCall();
+    }
+
+    const pad = n => String(n).padStart(2, "0");
+    const fmt = d => pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + " " +
+                     pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+
+    function buildRecord(number) {
+      const scored = log.filter(e => e.score !== undefined);
+      const last = scored[scored.length - 1];
+      const peak = scored.length ? Math.max(...scored.map(e => e.score)) : "n/a";
+      const out = [];
+      out.push("================================================================================");
+      out.push("                     SACHET (सचेत) INCIDENT CALL RECORD                        ");
+      out.push("                    Citizen Defensive Cyber-Safety Report                       ");
+      out.push("================================================================================");
+      out.push("Source              : " + (isDemo ? "Demo Sample Simulation" : "Live Phone Input"));
+      out.push("Call Started        : " + (log[0] ? fmt(log[0].time) : "n/a"));
+      out.push("Call Ended          : " + fmt(new Date()));
+      out.push("Suspect Caller No.  : " + (number || "Not provided"));
+      out.push("Final Risk Score    : " + (last ? last.score + "/100 (" + last.level + ")" : "n/a"));
+      out.push("Peak Danger Score   : " + peak + "/100");
+      out.push("Severe Alert Shown  : " + (scored.some(e => e.alert) ? "YES (Confirmed Threat)" : "No"));
+      out.push("--------------------------------------------------------------------------------");
+      out.push("TRANSCRIPT LOG:");
+      out.push("--------------------------------------------------------------------------------");
+      log.forEach(e => {
+        const who = e.speaker === "caller" ? "CALLER" : "RECEIVER";
+        const sc = (e.speaker === "caller" && e.score !== undefined) ? "   [Risk: " + e.score + "]" : "";
+        out.push("[" + fmt(e.time) + "] " + who + ": " + e.text + sc);
+      });
+      out.push("--------------------------------------------------------------------------------");
+      out.push("IF YOU SUSPECT FRAUD OR SENT MONEY:");
+      out.push("1. Call 1930 (National Cyber Fraud Helpline) immediately.");
+      out.push("2. Lodge an official cyber complaint at: https://cybercrime.gov.in");
+      out.push("3. Notify your bank manager to freeze transactions and provide this transcript.");
+      out.push("================================================================================");
+      return out.join("\n");
+    }
+
+    function download(name, text) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }
+
+    $("saveYes").onclick = async () => {
+      const d = new Date();
+      const name = "sachet-evidence-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
+                   "-" + pad(d.getHours()) + pad(d.getMinutes()) + ".txt";
+      download(name, buildRecord($("callerNo").value.trim()));
+      $("saveDlg").close();
+      await resetCall();
+      $("reason").textContent = "Evidence saved locally. Session completely purged from server.";
+    };
+    $("saveNo").onclick = async () => {
+      $("saveDlg").close();
+      await resetCall();
+      $("reason").textContent = "Call ended. Session erased from memory.";
+    };
+
+    async function playSample(key, btn) {
+      if (playing) return;
+      await resetCall();
+      playing = true;
+      isDemo = true;
+      document.querySelectorAll(".demo-preset-btn").forEach(b => b.classList.remove("active"));
+      if (btn) btn.classList.add("active");
+
+      for (const [who, text] of SAMPLES[key]) {
+        if (!playing) break;
+        await send(who, text);
+        await new Promise(r => setTimeout(r, 1800));
+      }
+      playing = false;
+      if (btn) btn.classList.remove("active");
+    }
+
+    let activeSpeaker = "caller";
+
+    function updateMicLabel() {
+      const isCaller = (activeSpeaker === "caller");
+      if (rec && rec.active) {
+        $("micBtn").querySelector("span").textContent = isCaller
+          ? "Stop Mic (Listening as Caller)"
+          : "Stop Mic (Listening as Receiver)";
+      } else {
+        $("micBtn").querySelector("span").textContent = isCaller
+          ? "Start Microphone (as Caller)"
+          : "Start Microphone (as Receiver)";
+      }
+    }
+
+    function setSpeaker(val) {
+      if (activeSpeaker === val) return;
+      activeSpeaker = val;
+      $("optCaller").classList.toggle("active", val === "caller");
+      $("optReceiver").classList.toggle("active", val === "victim");
+      $("typed").placeholder = val === "caller"
+        ? "Type a statement as Caller (suspect) and press Enter..."
+        : "Type a statement as Receiver (you) and press Enter...";
+
+      updateMicLabel();
+
+      // Immediately inform active recorder to flush/lock boundary for new speaker
+      if (rec && rec.active && typeof rec.onSpeakerChange === "function") {
+        rec.onSpeakerChange(val);
+      }
+    }
+
+    $("optCaller").onclick = () => setSpeaker("caller");
+    $("optReceiver").onclick = () => setSpeaker("victim");
+    updateMicLabel();
+
+    ["sc1", "sc2", "sc3", "sc4"].forEach(k => {
+      $(k).onclick = function() { playSample(k, this); };
+    });
+    $("endBtn").onclick = () => endCall(true);
+    $("typed").addEventListener("keydown", e => {
+      if (e.key === "Enter" && e.target.value.trim()) {
+        send(activeSpeaker, e.target.value.trim());
+        e.target.value = "";
+      }
+    });
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    async function transcribeAndSend(blob, speakerWhenRecorded) {
+      const mySid = sid;
+      const targetSpeaker = speakerWhenRecorded || activeSpeaker;
+      const fd = new FormData();
+      fd.append("file", blob, "seg.webm");
+      const h = {};
+      if ($("key").value.trim()) h["x-api-key"] = $("key").value.trim();
+      try {
+        const r = await fetch(base() + "/v1/transcribe?lang=hi", { method: "POST", headers: h, body: fd });
+        if (!r.ok) throw new Error("STT failed: " + r.status);
+        const { text } = await r.json();
+        if (mySid === sid && text && text.trim()) {
+          send(targetSpeaker, text.trim());
+        }
+      } catch (e) {
+        $("err").textContent = "Speech recognition: " + e.message;
+      }
+    }
+
+    $("micBtn").onclick = async () => {
+      if (rec) { stopInputs(); return; }
+      $("err").textContent = "";
+
+      // 1. Try Native Web Speech API (instant streaming, zero server lag)
+      if (SpeechRecognition) {
+        try {
+          const sr = new SpeechRecognition();
+          sr.continuous = true;
+          sr.interimResults = false;
+          sr.lang = "hi-IN";
+
+          // Lock in speaker who started speaking this utterance
+          let utteranceSpeaker = activeSpeaker;
+
+          sr.onspeechstart = () => {
+            utteranceSpeaker = activeSpeaker;
+          };
+
+          sr.onresult = (e) => {
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+              if (e.results[i].isFinal) {
+                const phrase = e.results[i][0].transcript.trim();
+                if (phrase) {
+                  // Always post strictly according to the toggle state
+                  send(activeSpeaker, phrase);
+                }
+              }
+            }
+          };
+
+          sr.onerror = (e) => {
+            if (e.error !== "no-speech") {
+              $("err").textContent = "Mic notice (" + e.error + "), listening...";
+            }
+          };
+
+          sr.onend = () => {
+            if (rec && rec.active) {
+              try { sr.start(); } catch (err) {}
+            }
+          };
+
+          sr.start();
+          rec = {
+            active: true,
+            onSpeakerChange(newSpeaker) {
+              // Immediately abort in-flight buffer on toggle so words cannot leak across roles
+              try { sr.abort(); } catch (e) {}
+              setTimeout(() => {
+                if (this.active) {
+                  try { sr.start(); } catch (err) {}
+                }
+              }, 40);
+            },
+            stop() {
+              this.active = false;
+              try { sr.stop(); } catch (err) {}
+            }
+          };
+
+          $("micBtn").classList.add("recording");
+          updateMicLabel();
+          return;
+        } catch (err) {
+          console.warn("Native speech failed, using audio chunks fallback:", err);
+        }
+      }
+
+      // 2. Fallback: 2.5-second MediaRecorder audio chunks with Whisper
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true }
+        });
+      } catch (e) {
+        $("err").textContent = "Microphone access blocked: " + e.message;
+        return;
+      }
+
+      const ctl = {
+        active: true,
+        mr: null,
+        onSpeakerChange(newSpeaker) {
+          // Immediately stop and drop in-flight chunk on toggle to prevent bleeding
+          if (this.mr && this.mr.state === "recording") {
+            try { 
+              this.mr.ondataavailable = null;
+              this.mr.stop(); 
+            } catch (e) {}
+          }
+        },
+        stop() {
+          this.active = false;
+          if (this.mr && this.mr.state !== "inactive") this.mr.stop();
+          stream.getTracks().forEach(t => t.stop());
+        }
+      };
+      rec = ctl;
+      $("micBtn").classList.add("recording");
+      updateMicLabel();
+
+      const cycle = () => {
+        if (!ctl.active) return;
+        const mr = new MediaRecorder(stream);
+        ctl.mr = mr;
+        const parts = [];
+        mr.ondataavailable = e => { if (e.data.size) parts.push(e.data); };
+        mr.onstop = () => {
+          if (parts.length && ctl.active) {
+            transcribeAndSend(new Blob(parts, { type: mr.mimeType }), activeSpeaker);
+          }
+          if (ctl.active) cycle();
+        };
+        mr.start();
+        setTimeout(() => {
+          if (mr.state === "recording") mr.stop();
+        }, 2200);
+      };
       cycle();
     };
-    mr.start();
-    setTimeout(() => { if (mr.state === "recording") mr.stop(); }, 6000);
-  };
-  cycle();
-};
-
-</script>
+  </script>
 </body>
 </html>

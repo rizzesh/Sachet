@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sachet API Reference — REST API Specification</title>
+  <meta name="description" content="Official documentation for Sachet FastAPI endpoints: /v1/analyze, /v1/session/end, /v1/transcribe, and /health.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Emergency Banner -->
+  <aside class="emergency-banner">
+    <span>🚨 <strong>Suspect fraud or cyber crime?</strong> Call National Cyber Helpline <strong>1930</strong> immediately or report at <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">cybercrime.gov.in</a></span>
+  </aside>
+
+  <!-- Navigation Bar -->
+  <header class="site-nav">
+    <div class="container nav-wrapper">
+      <a href="index.html" class="brand-group">
+        <div class="brand-logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <div class="brand-name">
+          Sachet <span class="hindi">[सचेत]</span>
+        </div>
+        <span class="brand-badge">Civic Shield</span>
+      </a>
+
+      <nav>
+        <ul class="nav-links">
+          <li><a href="how-it-works.html" class="nav-link">How it Works</a></li>
+          <li><a href="github.html" class="nav-link">GitHub</a></li>
+          <li><a href="api.html" class="nav-link active">API</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="index.html#demo" class="btn btn-primary" style="padding: 8px 16px; font-size: 13px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Try Live Demo
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Header -->
+  <section class="subpage-hero">
+    <div class="container">
+      <div class="pill-badge">
+        <span class="pulse-dot"></span>
+        FastAPI Service Docs
+      </div>
+      <h1 class="subpage-title">Sachet API Reference</h1>
+      <p class="subpage-subtitle">
+        Integrate real-time conversational scam detection into mobile dialers, telecom middleware, or civic dashboards with simple JSON endpoints.
+      </p>
+    </div>
+  </section>
+
+  <!-- API Content -->
+  <section class="doc-section">
+    <div class="container" style="max-width: 920px;">
+
+      <!-- Overview Card -->
+      <div class="doc-card">
+        <h2>Base URL & Authentication</h2>
+        <p>
+          The Sachet API runs as a lightweight, asynchronous FastAPI service. By default, it runs locally on:
+        </p>
+        <div class="code-block">
+          http://127.0.0.1:8000
+        </div>
+        <p>
+          If configured with an API key, supply it in the <code>x-api-key</code> request header. All active session state resides strictly in RAM and expires after 30 minutes of inactivity.
+        </p>
+      </div>
+
+      <!-- Endpoint 1: /v1/analyze -->
+      <div class="doc-card">
+        <h2>1. Analyze Call Turn</h2>
+        <div style="display:inline-block; font-size:13px; font-weight:700; padding:4px 10px; border-radius:6px; background:rgba(59,130,246,0.15); color:var(--blue-brand); border:1px solid rgba(59,130,246,0.3); margin-bottom:14px;">
+          POST /v1/analyze
+        </div>
+        <p>
+          Ingests a single utterance from either the caller or the citizen. Updates the rolling conversational context, runs MuRIL scoring, checks psychological signals, and returns risk metrics.
+        </p>
+
+        <h3>Request Body (JSON)</h3>
+        <table class="doc-table">
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Type</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>session_id</code></td>
+              <td>string</td>
+              <td>Unique UUID identifying the call session.</td>
+            </tr>
+            <tr>
+              <td><code>text</code></td>
+              <td>string</td>
+              <td>The transcribed dialogue turn in Hindi, Hinglish, or English.</td>
+            </tr>
+            <tr>
+              <td><code>speaker</code></td>
+              <td>string</td>
+              <td><code>"caller"</code> (suspect) or <code>"victim"</code> (citizen). Default: <code>"caller"</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Response (JSON)</h3>
+        <table class="doc-table">
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Type</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>risk_score</code></td>
+              <td>integer</td>
+              <td>Calculated scam risk score from <code>0</code> to <code>100</code>.</td>
+            </tr>
+            <tr>
+              <td><code>level</code></td>
+              <td>string</td>
+              <td><code>"low"</code> (&lt;40), <code>"medium"</code> (40–64), or <code>"high"</code> (&ge;65).</td>
+            </tr>
+            <tr>
+              <td><code>reason</code></td>
+              <td>string</td>
+              <td>Conversational explanation in natural Hindi explaining detected tactics.</td>
+            </tr>
+            <tr>
+              <td><code>signals</code></td>
+              <td>string[]</td>
+              <td>List of detected psychological signals (e.g. <code>["Digital arrest threat", "Urgency deadline"]</code>).</td>
+            </tr>
+            <tr>
+              <td><code>alert</code></td>
+              <td>boolean</td>
+              <td><code>true</code> when consecutive turns sustain high risk, triggering urgent citizen warning.</td>
+            </tr>
+            <tr>
+              <td><code>history</code></td>
+              <td>integer[]</td>
+              <td>Trajectory of risk scores across all turns in this session.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>cURL Example</h3>
+        <div class="code-block">
+curl -X POST http://127.0.0.1:8000/v1/analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "c71a34d9-8134-4bc8-8c54-722123bf0114",
+    "speaker": "caller",
+    "text": "Main CBI se bol raha hoon, aapke Aadhaar par arrest warrant hai, phone mat kaatiye."
+  }'
+        </div>
+      </div>
+
+      <!-- Endpoint 2: /v1/session/end -->
+      <div class="doc-card">
+        <h2>2. End Session & Purge RAM</h2>
+        <div style="display:inline-block; font-size:13px; font-weight:700; padding:4px 10px; border-radius:6px; background:rgba(239,68,68,0.15); color:var(--red-danger); border:1px solid rgba(239,68,68,0.3); margin-bottom:14px;">
+          POST /v1/session/end
+        </div>
+        <p>
+          Immediately erases and de-allocates the session's conversational turns and risk history from server memory. Guarantees zero residual data retention.
+        </p>
+
+        <h3>Request Body</h3>
+        <div class="code-block">
+{
+  "session_id": "c71a34d9-8134-4bc8-8c54-722123bf0114"
+}
+        </div>
+
+        <h3>Response</h3>
+        <div class="code-block">
+{
+  "deleted": true
+}
+        </div>
+      </div>
+
+      <!-- Endpoint 3: /v1/transcribe -->
+      <div class="doc-card">
+        <h2>3. Audio Chunk Transcription (Whisper)</h2>
+        <div style="display:inline-block; font-size:13px; font-weight:700; padding:4px 10px; border-radius:6px; background:rgba(16,185,129,0.15); color:var(--green-safe); border:1px solid rgba(16,185,129,0.3); margin-bottom:14px;">
+          POST /v1/transcribe?lang=hi
+        </div>
+        <p>
+          Streams raw audio chunks (WebM/WAV) to the lightweight Whisper STT pipeline. Returns pure text without retaining the uploaded audio file on disk.
+        </p>
+
+        <h3>Response</h3>
+        <div class="code-block">
+{
+  "text": "Aapke Aadhaar card par arrest warrant jaari hua hai."
+}
+        </div>
+      </div>
+
+      <!-- Endpoint 4: /health -->
+      <div class="doc-card">
+        <h2>4. Health & Status Check</h2>
+        <div style="display:inline-block; font-size:13px; font-weight:700; padding:4px 10px; border-radius:6px; background:rgba(255,255,255,0.08); color:#e5e7eb; border:1px solid var(--border-subtle); margin-bottom:14px;">
+          GET /health
+        </div>
+        <p>Returns service status and count of active ephemeral sessions in memory.</p>
+        <div class="code-block">
+{
+  "ok": true,
+  "sessions": 1
+}
+        </div>
+      </div>
+
+      <!-- Code Integration Example -->
+      <div class="doc-card">
+        <h2>Python Integration Example</h2>
+        <p>A simple snippet to stream turns into the Sachet API in Python:</p>
+        <div class="code-block">
+import requests
+
+session_id = "test-session-123"
+url = "http://127.0.0.1:8000/v1/analyze"
+
+turn_data = {
+    "session_id": session_id,
+    "speaker": "caller",
+    "text": "Sir aapka electricity bill due hai, aaj raat bijli kat jayegi."
+}
+
+response = requests.post(url, json=turn_data)
+result = response.json()
+
+print(f"Risk Score: {result['risk_score']}/100")
+print(f"Severity  : {result['level']}")
+print(f"Reason    : {result['reason']}")
+        </div>
+      </div>
+
+      <div style="text-align:center; margin-top:40px;">
+        <a href="index.html#demo" class="btn btn-primary" style="margin-right:12px;">Test with Live Web Demo</a>
+        <a href="github.html" class="btn btn-secondary">Explore GitHub Repository</a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand-group">
+            <div class="brand-logo-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div class="brand-name">Sachet <span class="hindi">[सचेत]</span></div>
+          </div>
+          <p>Real-time scam-call risk detection service for Hindi and Hinglish conversations.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Navigation</h4>
+          <ul class="footer-links">
+            <li><a href="how-it-works.html">How it Works</a></li>
+            <li><a href="github.html">GitHub Repository</a></li>
+            <li><a href="api.html">REST API Reference</a></li>
+            <li><a href="index.html#demo">Interactive Demo</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Civic Helpline</h4>
+          <ul class="footer-links">
+            <li><a href="tel:1930" style="color:#fde68a; font-weight:600;">📞 National Helpline: 1930</a></li>
+            <li><a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">cybercrime.gov.in</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>© 2026-2027 Sachet Project</div>
+        <div>Open source civic safety technology</div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
