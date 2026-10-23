@@ -84,14 +84,14 @@
       <div class="doc-card">
         <h2>2. Four-Stage Detection Pipeline</h2>
         <p>
-          Rather than brittle keyword blacklists (which scammers effortlessly evade by rephrasing), Sachet evaluates the temporal escalation of the call through four integrated stages:
+          Rather than brittle keyword blacklists (which scammers effortlessly evade by rephrasing), Sachet evaluates the temporal escalation of the call through four integrated stages. While overall conversational risk scoring is driven by our fine-tuned MuRIL transformer, the human-readable warning explanations (<code>reason</code>) are mapped via curated regex signal rules to guarantee clear, reliable, and auditable guidance.
         </p>
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:24px 0;">
           <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:18px;">
             <div style="color:var(--amber-light); font-weight:700; font-size:14px; margin-bottom:6px;">Stage 1: Text-Only Ingestion</div>
             <div style="font-size:13px; color:var(--text-muted); line-height:1.5;">
-              Speech is transcribed on-device or streamed chunk-by-chunk. Raw voice recordings are discarded immediately after transcription.
+              Speech is transcribed via browser speech APIs or server streaming; raw audio is never stored on disk and session transcripts are deleted after the call.
             </div>
           </div>
 
