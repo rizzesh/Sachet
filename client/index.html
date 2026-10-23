@@ -999,21 +999,47 @@
       }
     }
 
+    function stopInputs() {
+      if (rec) {
+        try { rec.stop(); } catch (e) {}
+        rec = null;
+      }
+      $("micBtn").classList.remove("recording");
+      updateMicLabel();
+    }
+
     $("micBtn").onclick = async () => {
       if (rec) { stopInputs(); return; }
       $("err").textContent = "";
 
+      // 0. Proactively trigger browser permission dialog via getUserMedia
+      let permStream = null;
+      try {
+        permStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true }
+        });
+      } catch (permErr) {
+        stopInputs();
+        if (permErr.name === "NotAllowedError" || permErr.name === "PermissionDeniedError") {
+          $("err").innerHTML = "Microphone blocked by browser. Click the lock/settings icon &#x1F512; in your address bar, set Microphone to <strong>Allow</strong>, then try again.";
+        } else {
+          $("err").textContent = "Microphone notice (" + permErr.name + "): " + permErr.message;
+        }
+        return;
+      }
+
       // 1. Try Native Web Speech API (instant streaming, zero server lag)
       if (SpeechRecognition) {
         try {
+          // Release track from initial permission check so SpeechRecognition can bind to hardware
+          permStream.getTracks().forEach(t => t.stop());
+
           const sr = new SpeechRecognition();
           sr.continuous = true;
           sr.interimResults = false;
           sr.lang = "hi-IN";
 
-          // Lock in speaker who started speaking this utterance
           let utteranceSpeaker = activeSpeaker;
-
           sr.onspeechstart = () => {
             utteranceSpeaker = activeSpeaker;
           };
@@ -1023,7 +1049,6 @@
               if (e.results[i].isFinal) {
                 const phrase = e.results[i][0].transcript.trim();
                 if (phrase) {
-                  // Always post strictly according to the toggle state
                   send(activeSpeaker, phrase);
                 }
               }
@@ -1031,8 +1056,13 @@
           };
 
           sr.onerror = (e) => {
-            if (e.error !== "no-speech") {
-              $("err").textContent = "Mic notice (" + e.error + "), listening...";
+            if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+              stopInputs();
+              $("err").innerHTML = "Microphone permission blocked. Click the lock/camera icon &#x1F512; in your browser address bar and select <strong>Allow</strong> for Microphone.";
+            } else if (e.error === "no-speech") {
+              // Normal silence interval, no action needed
+            } else {
+              $("err").textContent = "Mic notice (" + e.error + ")";
             }
           };
 
@@ -1046,7 +1076,6 @@
           rec = {
             active: true,
             onSpeakerChange(newSpeaker) {
-              // Immediately abort in-flight buffer on toggle so words cannot leak across roles
               try { sr.abort(); } catch (e) {}
               setTimeout(() => {
                 if (this.active) {
@@ -1069,14 +1098,17 @@
       }
 
       // 2. Fallback: 2.5-second MediaRecorder audio chunks with Whisper
-      let stream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true }
-        });
-      } catch (e) {
-        $("err").textContent = "Microphone access blocked: " + e.message;
-        return;
+      let stream = permStream;
+      if (!stream || !stream.active) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true }
+          });
+        } catch (e) {
+          $("err").textContent = "Microphone access blocked: " + e.message;
+          stopInputs();
+          return;
+        }
       }
 
       const ctl = {
